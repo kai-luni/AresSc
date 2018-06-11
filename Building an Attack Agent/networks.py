@@ -201,7 +201,7 @@ class Networks(object):
 
         # Use last trace for training
         model.add(LSTM(16,  activation='tanh'))
-        model.add(Dense(output_dim=action_size, activation='linear'))
+        model.add(Dense(units=action_size, activation='linear'))
 
         adam = Adam(lr=learning_rate)
         model.compile(loss='mse',optimizer=adam)

@@ -10,6 +10,7 @@ from pysc2.lib import features
 
 from doubleDQNAgent import DoubleDQNAgent
 from networks import Networks
+from qAgent import qAgent
 
 _NO_OP = actions.FUNCTIONS.no_op.id
 _SELECT_POINT = actions.FUNCTIONS.select_point.id
@@ -69,12 +70,12 @@ class AttackAgent(base_agent.BaseAgent):
         
         action_size = len(smart_actions)
         trace_length = 32
-        state_size = (trace_length, 20)
+        state_size = 20
         
         #self.qlearn = QLearningTable(actions=list(range(len(smart_actions))))
-        self.qlearn = DoubleDQNAgent(state_size = state_size, action_size = action_size, trace_length = trace_length)
-        self.qlearn.model = Networks.drqn(state_size, action_size, self.qlearn.learning_rate)
-        self.qlearn.target_model = Networks.drqn(state_size, action_size, self.qlearn.learning_rate)
+        self.qlearn = qAgent(state_size = state_size, action_size = action_size)
+        #self.qlearn.model = Networks.drqn(state_size, action_size, self.qlearn.learning_rate)
+        #self.qlearn.target_model = Networks.drqn(state_size, action_size, self.qlearn.learning_rate)
         
         self.episode_buf = [] # Save entire episode
 
@@ -84,11 +85,6 @@ class AttackAgent(base_agent.BaseAgent):
         self.previous_action = None
         self.previous_state = None
 
-    def update_target_model(self):
-        """
-        After some time interval update the target model to be same with model
-        """
-        self.qlearn.target_model.set_weights(self.qlearn.model.get_weights())
 
     def transformDistance(self, x, x_distance, y, y_distance):
         returnValue = None
@@ -112,9 +108,9 @@ class AttackAgent(base_agent.BaseAgent):
         super(AttackAgent, self).step(obs)
 
         # save progress every 10000 iterations
-        if self.steps % 10000 == 0:
-            print("Now we save model")
-            self.qlearn.model.save_weights("models/drqn.h5", overwrite=True)
+        # if self.steps % 10000 == 0:
+        #     print("Now we save model")
+        #     self.qlearn.model.save_weights("models/drqn.h5", overwrite=True)
 
         
         player_y, player_x = (obs.observation['minimap'][_PLAYER_RELATIVE] == _PLAYER_SELF).nonzero()
@@ -154,6 +150,7 @@ class AttackAgent(base_agent.BaseAgent):
         for i in range(0, 16):
             current_state[i + 4] = hot_squares[i]
 
+        stateObject = None
         if self.previous_action is not None:
             reward = 0
                 
@@ -163,49 +160,47 @@ class AttackAgent(base_agent.BaseAgent):
             if killed_building_score > self.previous_killed_building_score:
                 reward += KILL_BUILDING_REWARD
                 
-            # save the sample <s, a, r, s'> to episode buffer
+            # save the sample <s, a, r, s', done> to episode buffer
             #s: observation
             #r: reward
             #s': new state
-            self.episode_buf.append([self.previous_state, self.previous_action, reward, current_state])
-            if(reward > 0):
-                print(reward)
+            #done (can out as this is by episodes (?))
+            stateObject = [self.previous_state, self.previous_action, reward, current_state, obs.last()]
+            self.qlearn.memory.append(stateObject)
+
             #old
             #self.qlearn.learn(str(self.previous_state), self.previous_action, reward, str(current_state))
         
 
 
-        # Do the training
-        if self.episodes > self.qlearn.batch_size:
-            # Update epsilon
-            if self.qlearn.epsilon > self.qlearn.final_epsilon and self.steps > self.qlearn.observe:
-                self.qlearn.epsilon -= (self.qlearn.initial_epsilon - self.qlearn.final_epsilon) / self.qlearn.explore            
-            Q_max, loss = self.qlearn.train_replay()
-
-            # Update the target model to be same with model
-            if self.steps%self.qlearn.update_target_freq == 0:
-                print("update target model")
-                self.update_target_model()
-
-            if(self.steps%100 == 0):
-                print("Loss " + str(loss) + "Epsilon " + str(self.qlearn.epsilon))
+        self.qlearn.replay(32)
+        # # Do the training
+        # if self.episodes > self.qlearn.batch_size:
+        #     # Update epsilon
+        #     if self.qlearn.epsilon > self.qlearn.final_epsilon and self.steps > self.qlearn.observe:
+        #         self.qlearn.epsilon -= (self.qlearn.initial_epsilon - self.qlearn.final_epsilon) / self.qlearn.explore            
+        #     Q_max, loss = self.qlearn.train_replay()
         
 
 
         if obs.last():
-            self.qlearn.memory.add(self.episode_buf)
+            #self.qlearn.memory.add(self.episode_buf)
             self.episode_buf = [] # Reset Episode Buf
 
-        if len(self.episode_buf) > self.qlearn.trace_length:
-            # 1x8x64x64x3
-            state_series = np.array([trace[-1] for trace in self.episode_buf[-self.qlearn.trace_length:]])
-            state_series = np.expand_dims(state_series, axis=0)
-            rl_action  = self.qlearn.get_action(state_series)
-        else:
-            rl_action = random.randrange(self.qlearn.action_size)
+        # if len(self.episode_buf) > self.qlearn.trace_length:
+        #     # 1x8x64x64x3
+        #     state_series = np.array([trace[-1] for trace in self.episode_buf[-self.qlearn.trace_length:]])
+        #     state_series = np.expand_dims(state_series, axis=0)
+        #     rl_action  = self.qlearn.get_action(state_series)
+        # else:
+        #     rl_action = random.randrange(self.qlearn.action_size)
         #rl_action = self.qlearn.choose_action(str(current_state))
+        rl_action = self.qlearn.act(current_state)
         smart_action = smart_actions[rl_action]
         
+        if(self.steps%100 == 0):
+            print("Epsilon " + str(self.qlearn.exploration_rate) + " Action " + smart_action)
+
         self.previous_killed_unit_score = killed_unit_score
         self.previous_killed_building_score = killed_building_score
         self.previous_state = current_state
