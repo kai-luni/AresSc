@@ -9,6 +9,8 @@ from pysc2.agents import base_agent
 from pysc2.lib import actions
 from pysc2.lib import features
 
+from qAgent import qAgent
+
 _NO_OP = actions.FUNCTIONS.no_op.id
 _SELECT_POINT = actions.FUNCTIONS.select_point.id
 _BUILD_SUPPLY_DEPOT = actions.FUNCTIONS.Build_SupplyDepot_screen.id
@@ -56,57 +58,16 @@ for mm_x in range(0, 64):
         if (mm_x + 1) % 32 == 0 and (mm_y + 1) % 32 == 0:
             smart_actions.append(ACTION_ATTACK + '_' + str(mm_x - 16) + '_' + str(mm_y - 16))
 
-# Stolen from https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow
-class QLearningTable:
-    def __init__(self, actions, learning_rate=0.01, reward_decay=0.9, e_greedy=0.9):
-        self.actions = actions  # a list
-        self.lr = learning_rate
-        self.gamma = reward_decay
-        self.epsilon = e_greedy
-        self.q_table = pd.DataFrame(columns=self.actions, dtype=np.float64)
-
-    def choose_action(self, observation):
-        self.check_state_exist(observation)
-        
-        if np.random.uniform() < self.epsilon:
-            # choose best action
-            state_action = self.q_table.ix[observation, :]
-            
-            # some actions have the same value
-            state_action = state_action.reindex(np.random.permutation(state_action.index))
-            
-            action = state_action.idxmax()
-        else:
-            # choose random action
-            action = np.random.choice(self.actions)
-            
-        return action
-
-    def learn(self, s, a, r, s_):
-        self.check_state_exist(s_)
-        self.check_state_exist(s)
-        
-        q_predict = self.q_table.ix[s, a]
-        
-        if s_ != 'terminal':
-            q_target = r + self.gamma * self.q_table.ix[s_, :].max()
-        else:
-            q_target = r  # next state is terminal
-            
-        # update
-        self.q_table.ix[s, a] += self.lr * (q_target - q_predict)
-
-    def check_state_exist(self, state):
-        if state not in self.q_table.index:
-            # append new state to q table
-            self.q_table = self.q_table.append(pd.Series([0] * len(self.actions), index=self.q_table.columns, name=state))
 
 class SparseAgent(base_agent.BaseAgent):
     def __init__(self):
         super(SparseAgent, self).__init__()
         
-        self.qlearn = QLearningTable(actions=list(range(len(smart_actions))))
-        
+        action_size = len(smart_actions)
+        state_size = 8
+        self.qlearn = qAgent(state_size = state_size, action_size = action_size)
+
+
         self.previous_action = None
         self.previous_state = None
         
@@ -143,20 +104,6 @@ class SparseAgent(base_agent.BaseAgent):
     def step(self, obs):
         super(SparseAgent, self).step(obs)
         
-        if obs.last():
-            reward = obs.reward
-        
-            self.qlearn.learn(str(self.previous_state), self.previous_action, reward, 'terminal')
-            
-            self.qlearn.q_table.to_pickle(DATA_FILE + '.gz', 'gzip')
-            
-            self.previous_action = None
-            self.previous_state = None
-            
-            self.move_number = 0
-            
-            return actions.FunctionCall(_NO_OP, [])
-        
         unit_type = obs.observation['screen'][_UNIT_TYPE]
 
         if obs.first():
@@ -173,121 +120,159 @@ class SparseAgent(base_agent.BaseAgent):
 
         barracks_y, barracks_x = (unit_type == _TERRAN_BARRACKS).nonzero()
         barracks_count = int(round(len(barracks_y) / 137))
+
+        if obs.last():
+            reward = obs.reward
+            current_state = self.getCurrentState(obs, cc_count, supply_depot_count, barracks_count)
+            stateObject = [self.previous_state, self.previous_action, reward, current_state, obs.last()]
+            self.qlearn.memory.append(stateObject)
+            #self.qlearn.learn(str(self.previous_state), self.previous_action, reward, 'terminal')
+            
+            #self.qlearn.q_table.to_pickle(DATA_FILE + '.gz', 'gzip')
+            
+            self.previous_action = None
+            self.previous_state = None
+            
+            self.move_number = 0
+            
+            return actions.FunctionCall(_NO_OP, [])
             
         if self.move_number == 0:
             self.move_number += 1
-            
-            current_state = np.zeros(8)
-            current_state[0] = cc_count
-            current_state[1] = supply_depot_count
-            current_state[2] = barracks_count
-            current_state[3] = obs.observation['player'][_ARMY_SUPPLY]
-    
-            hot_squares = np.zeros(4)        
-            enemy_y, enemy_x = (obs.observation['minimap'][_PLAYER_RELATIVE] == _PLAYER_HOSTILE).nonzero()
-            for i in range(0, len(enemy_y)):
-                y = int(math.ceil((enemy_y[i] + 1) / 32))
-                x = int(math.ceil((enemy_x[i] + 1) / 32))
-                
-                hot_squares[((y - 1) * 2) + (x - 1)] = 1
-            
-            if not self.base_top_left:
-                hot_squares = hot_squares[::-1]
-            
-            for i in range(0, 4):
-                current_state[i + 4] = hot_squares[i]
-    
-            if self.previous_action is not None:
-                self.qlearn.learn(str(self.previous_state), self.previous_action, 0, str(current_state))
-        
-            rl_action = self.qlearn.choose_action(str(current_state))
-
-            self.previous_state = current_state
-            self.previous_action = rl_action
-        
-            smart_action, x, y = self.splitAction(self.previous_action)
-            
-            if smart_action == ACTION_BUILD_BARRACKS or smart_action == ACTION_BUILD_SUPPLY_DEPOT:
-                unit_y, unit_x = (unit_type == _TERRAN_SCV).nonzero()
-                    
-                if unit_y.any():
-                    i = random.randint(0, len(unit_y) - 1)
-                    target = [unit_x[i], unit_y[i]]
-                    
-                    return actions.FunctionCall(_SELECT_POINT, [_NOT_QUEUED, target])
-                
-            elif smart_action == ACTION_BUILD_MARINE:
-                if barracks_y.any():
-                    i = random.randint(0, len(barracks_y) - 1)
-                    target = [barracks_x[i], barracks_y[i]]
-            
-                    return actions.FunctionCall(_SELECT_POINT, [_SELECT_ALL, target])
-                
-            elif smart_action == ACTION_ATTACK:
-                if _SELECT_ARMY in obs.observation['available_actions']:
-                    return actions.FunctionCall(_SELECT_ARMY, [_NOT_QUEUED])
+            return self.moveNumberZero(obs, cc_count, supply_depot_count, barracks_count, barracks_x, barracks_y, unit_type)
         
         elif self.move_number == 1:
             self.move_number += 1
-            
-            smart_action, x, y = self.splitAction(self.previous_action)
-                
-            if smart_action == ACTION_BUILD_SUPPLY_DEPOT:
-                if supply_depot_count < 2 and _BUILD_SUPPLY_DEPOT in obs.observation['available_actions']:
-                    if self.cc_y.any():
-                        if supply_depot_count == 0:
-                            target = self.transformDistance(round(self.cc_x.mean()), -35, round(self.cc_y.mean()), 0)
-                        elif supply_depot_count == 1:
-                            target = self.transformDistance(round(self.cc_x.mean()), -25, round(self.cc_y.mean()), -25)
-    
-                        return actions.FunctionCall(_BUILD_SUPPLY_DEPOT, [_NOT_QUEUED, target])
-            
-            elif smart_action == ACTION_BUILD_BARRACKS:
-                if barracks_count < 2 and _BUILD_BARRACKS in obs.observation['available_actions']:
-                    if self.cc_y.any():
-                        if  barracks_count == 0:
-                            target = self.transformDistance(round(self.cc_x.mean()), 15, round(self.cc_y.mean()), -9)
-                        elif  barracks_count == 1:
-                            target = self.transformDistance(round(self.cc_x.mean()), 15, round(self.cc_y.mean()), 12)
-    
-                        return actions.FunctionCall(_BUILD_BARRACKS, [_NOT_QUEUED, target])
-    
-            elif smart_action == ACTION_BUILD_MARINE:
-                if _TRAIN_MARINE in obs.observation['available_actions']:
-                    return actions.FunctionCall(_TRAIN_MARINE, [_QUEUED])
-        
-            elif smart_action == ACTION_ATTACK:
-                do_it = True
-                
-                if len(obs.observation['single_select']) > 0 and obs.observation['single_select'][0][0] == _TERRAN_SCV:
-                    do_it = False
-                
-                if len(obs.observation['multi_select']) > 0 and obs.observation['multi_select'][0][0] == _TERRAN_SCV:
-                    do_it = False
-                
-                if do_it and _ATTACK_MINIMAP in obs.observation["available_actions"]:
-                    x_offset = random.randint(-1, 1)
-                    y_offset = random.randint(-1, 1)
-                    
-                    return actions.FunctionCall(_ATTACK_MINIMAP, [_NOT_QUEUED, self.transformLocation(int(x) + (x_offset * 8), int(y) + (y_offset * 8))])
+            return self.moveNumberOne(obs, supply_depot_count, barracks_count)
                 
         elif self.move_number == 2:
             self.move_number = 0
+            self.moveNumberTwo(obs, unit_type)
             
-            smart_action, x, y = self.splitAction(self.previous_action)
-                
-            if smart_action == ACTION_BUILD_BARRACKS or smart_action == ACTION_BUILD_SUPPLY_DEPOT:
-                if _HARVEST_GATHER in obs.observation['available_actions']:
-                    unit_y, unit_x = (unit_type == _NEUTRAL_MINERAL_FIELD).nonzero()
-                    
-                    if unit_y.any():
-                        i = random.randint(0, len(unit_y) - 1)
-                        
-                        m_x = unit_x[i]
-                        m_y = unit_y[i]
-                        
-                        target = [int(m_x), int(m_y)]
-                        
-                        return actions.FunctionCall(_HARVEST_GATHER, [_QUEUED, target])
+        
+
         
         return actions.FunctionCall(_NO_OP, [])
+
+    def moveNumberZero(self, obs, cc_count, supply_depot_count, barracks_count, barracks_x, barracks_y, unit_type):
+        self.move_number += 1
+        
+        current_state = self.getCurrentState(obs, cc_count, supply_depot_count, barracks_count)
+
+        if self.previous_action is not None and not obs.last():
+            stateObject = [self.previous_state, self.previous_action, 0, current_state, obs.last()]
+            self.qlearn.memory.append(stateObject)
+            self.qlearn.replay(64)
+            #self.qlearn.learn(str(self.previous_state), self.previous_action, 0, str(current_state))
+    
+        #rl_action = self.qlearn.choose_action(str(current_state))
+        rl_action = self.qlearn.act(current_state)
+        self.previous_state = current_state
+        self.previous_action = rl_action
+    
+        smart_action, x, y = self.splitAction(self.previous_action)
+        
+        if smart_action == ACTION_BUILD_BARRACKS or smart_action == ACTION_BUILD_SUPPLY_DEPOT:
+            unit_y, unit_x = (unit_type == _TERRAN_SCV).nonzero()
+                
+            if unit_y.any():
+                i = random.randint(0, len(unit_y) - 1)
+                target = [unit_x[i], unit_y[i]]
+                
+                return actions.FunctionCall(_SELECT_POINT, [_NOT_QUEUED, target])
+            
+        elif smart_action == ACTION_BUILD_MARINE:
+            if barracks_y.any():
+                i = random.randint(0, len(barracks_y) - 1)
+                target = [barracks_x[i], barracks_y[i]]
+        
+                return actions.FunctionCall(_SELECT_POINT, [_SELECT_ALL, target])
+            
+        elif smart_action == ACTION_ATTACK:
+            if _SELECT_ARMY in obs.observation['available_actions']:
+                return actions.FunctionCall(_SELECT_ARMY, [_NOT_QUEUED])
+
+        raise Exception('(moveNumberZero)Undefined action: ' + smart_action)
+
+    def moveNumberOne(self, obs, supply_depot_count, barracks_count):
+        smart_action, x, y = self.splitAction(self.previous_action)
+            
+        if smart_action == ACTION_BUILD_SUPPLY_DEPOT:
+            if supply_depot_count < 2 and _BUILD_SUPPLY_DEPOT in obs.observation['available_actions']:
+                if self.cc_y.any():
+                    if supply_depot_count == 0:
+                        target = self.transformDistance(round(self.cc_x.mean()), -35, round(self.cc_y.mean()), 0)
+                    elif supply_depot_count == 1:
+                        target = self.transformDistance(round(self.cc_x.mean()), -25, round(self.cc_y.mean()), -25)
+
+                    return actions.FunctionCall(_BUILD_SUPPLY_DEPOT, [_NOT_QUEUED, target])
+        
+        elif smart_action == ACTION_BUILD_BARRACKS:
+            if barracks_count < 2 and _BUILD_BARRACKS in obs.observation['available_actions']:
+                if self.cc_y.any():
+                    if  barracks_count == 0:
+                        target = self.transformDistance(round(self.cc_x.mean()), 15, round(self.cc_y.mean()), -9)
+                    elif  barracks_count == 1:
+                        target = self.transformDistance(round(self.cc_x.mean()), 15, round(self.cc_y.mean()), 12)
+
+                    return actions.FunctionCall(_BUILD_BARRACKS, [_NOT_QUEUED, target])
+
+        elif smart_action == ACTION_BUILD_MARINE:
+            if _TRAIN_MARINE in obs.observation['available_actions']:
+                return actions.FunctionCall(_TRAIN_MARINE, [_QUEUED])
+    
+        elif smart_action == ACTION_ATTACK:
+            do_it = True
+            
+            if len(obs.observation['single_select']) > 0 and obs.observation['single_select'][0][0] == _TERRAN_SCV:
+                do_it = False
+            
+            if len(obs.observation['multi_select']) > 0 and obs.observation['multi_select'][0][0] == _TERRAN_SCV:
+                do_it = False
+            
+            if do_it and _ATTACK_MINIMAP in obs.observation["available_actions"]:
+                x_offset = random.randint(-1, 1)
+                y_offset = random.randint(-1, 1)
+                
+                return actions.FunctionCall(_ATTACK_MINIMAP, [_NOT_QUEUED, self.transformLocation(int(x) + (x_offset * 8), int(y) + (y_offset * 8))])
+        raise Exception('(moveNumberOne)Undefined action: ' + smart_action)
+
+    def moveNumberTwo(self, obs, unit_type):
+        smart_action, x, y = self.splitAction(self.previous_action)
+            
+        if smart_action == ACTION_BUILD_BARRACKS or smart_action == ACTION_BUILD_SUPPLY_DEPOT:
+            if _HARVEST_GATHER in obs.observation['available_actions']:
+                unit_y, unit_x = (unit_type == _NEUTRAL_MINERAL_FIELD).nonzero()
+                
+                if unit_y.any():
+                    i = random.randint(0, len(unit_y) - 1)
+                    
+                    m_x = unit_x[i]
+                    m_y = unit_y[i]
+                    
+                    target = [int(m_x), int(m_y)]
+                    
+                    return actions.FunctionCall(_HARVEST_GATHER, [_QUEUED, target])
+        raise Exception('(moveNumberTwo)Undefined action: ' + smart_action)
+
+    def getCurrentState(self, obs, cc_count, supply_depot_count, barracks_count):
+        current_state = np.zeros(8)
+        current_state[0] = cc_count
+        current_state[1] = supply_depot_count
+        current_state[2] = barracks_count
+        current_state[3] = obs.observation['player'][_ARMY_SUPPLY]
+
+        hot_squares = np.zeros(4)        
+        enemy_y, enemy_x = (obs.observation['minimap'][_PLAYER_RELATIVE] == _PLAYER_HOSTILE).nonzero()
+        for i in range(0, len(enemy_y)):
+            y = int(math.ceil((enemy_y[i] + 1) / 32))
+            x = int(math.ceil((enemy_x[i] + 1) / 32))
+            
+            hot_squares[((y - 1) * 2) + (x - 1)] = 1
+        
+        if not self.base_top_left:
+            hot_squares = hot_squares[::-1]
+        
+        for i in range(0, 4):
+            current_state[i + 4] = hot_squares[i]
+        return current_state

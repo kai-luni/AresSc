@@ -8,6 +8,9 @@ from pysc2.agents import base_agent
 from pysc2.lib import actions
 from pysc2.lib import features
 
+from networks import Networks
+from qAgent import qAgent
+
 _NO_OP = actions.FUNCTIONS.no_op.id
 _SELECT_POINT = actions.FUNCTIONS.select_point.id
 _BUILD_SUPPLY_DEPOT = actions.FUNCTIONS.Build_SupplyDepot_screen.id
@@ -58,64 +61,36 @@ for mm_x in range(0, 64):
 KILL_UNIT_REWARD = 0.2
 KILL_BUILDING_REWARD = 0.5
 
-# Stolen from https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow
-class QLearningTable:
-    def __init__(self, actions, learning_rate=0.01, reward_decay=0.9, e_greedy=0.9):
-        self.actions = actions  # a list
-        self.lr = learning_rate
-        self.gamma = reward_decay
-        self.epsilon = e_greedy
-        self.q_table = pd.DataFrame(columns=self.actions, dtype=np.float64)
-
-    def choose_action(self, observation):
-        self.check_state_exist(observation)
-        
-        if np.random.uniform() < self.epsilon:
-            # choose best action
-            state_action = self.q_table.ix[observation, :]
-            
-            # some actions have the same value
-            state_action = state_action.reindex(np.random.permutation(state_action.index))
-            
-            action = state_action.idxmax()
-        else:
-            # choose random action
-            action = np.random.choice(self.actions)
-            
-        return action
-
-    def learn(self, s, a, r, s_):
-        self.check_state_exist(s_)
-        self.check_state_exist(s)
-        
-        q_predict = self.q_table.ix[s, a]
-        q_target = r + self.gamma * self.q_table.ix[s_, :].max()
-        
-        # update
-        self.q_table.ix[s, a] += self.lr * (q_target - q_predict)
-
-    def check_state_exist(self, state):
-        if state not in self.q_table.index:
-            # append new state to q table
-            self.q_table = self.q_table.append(pd.Series([0] * len(self.actions), index=self.q_table.columns, name=state))
-
 class AttackAgent(base_agent.BaseAgent):
     def __init__(self):
         super(AttackAgent, self).__init__()
+
+        self.max_memory = 50000
         
-        self.qlearn = QLearningTable(actions=list(range(len(smart_actions))))
-        
+        action_size = len(smart_actions)
+        state_size = 20
+        self.qlearn = qAgent(state_size = state_size, action_size = action_size)
+
+        self.episode_buf = [] # Save entire episode
+
         self.previous_killed_unit_score = 0
         self.previous_killed_building_score = 0
         
         self.previous_action = None
         self.previous_state = None
-        
+
+
     def transformDistance(self, x, x_distance, y, y_distance):
+        returnValue = None
         if not self.base_top_left:
-            return [x - x_distance, y - y_distance]
-        
-        return [x + x_distance, y + y_distance]
+            returnValue = [x - x_distance, y - y_distance]
+        else:
+            returnValue = [x + x_distance, y + y_distance]
+        if(returnValue[0] < 0):
+            returnValue[0] = 0
+        if(returnValue[1] < 0):
+            returnValue[1] = 0
+        return returnValue
     
     def transformLocation(self, x, y):
         if not self.base_top_left:
@@ -125,6 +100,12 @@ class AttackAgent(base_agent.BaseAgent):
         
     def step(self, obs):
         super(AttackAgent, self).step(obs)
+
+        # save progress every 10000 iterations
+        # if self.steps % 10000 == 0:
+        #     print("Now we save model")
+        #     self.qlearn.model.save_weights("models/drqn.h5", overwrite=True)
+
         
         player_y, player_x = (obs.observation['minimap'][_PLAYER_RELATIVE] == _PLAYER_SELF).nonzero()
         self.base_top_left = 1 if player_y.any() and player_y.mean() <= 31 else 0
@@ -163,6 +144,7 @@ class AttackAgent(base_agent.BaseAgent):
         for i in range(0, 16):
             current_state[i + 4] = hot_squares[i]
 
+        stateObject = None
         if self.previous_action is not None:
             reward = 0
                 
@@ -172,11 +154,47 @@ class AttackAgent(base_agent.BaseAgent):
             if killed_building_score > self.previous_killed_building_score:
                 reward += KILL_BUILDING_REWARD
                 
-            self.qlearn.learn(str(self.previous_state), self.previous_action, reward, str(current_state))
+            # save the sample <s, a, r, s', done> to episode buffer
+            #s: observation
+            #r: reward
+            #s': new state
+            #done (can out as this is by episodes (?))
+            stateObject = [self.previous_state, self.previous_action, reward, current_state, obs.last()]
+            self.qlearn.memory.append(stateObject)
+
+            #old
+            #self.qlearn.learn(str(self.previous_state), self.previous_action, reward, str(current_state))
         
-        rl_action = self.qlearn.choose_action(str(current_state))
+
+
+        self.qlearn.replay(32)
+        # # Do the training
+        # if self.episodes > self.qlearn.batch_size:
+        #     # Update epsilon
+        #     if self.qlearn.epsilon > self.qlearn.final_epsilon and self.steps > self.qlearn.observe:
+        #         self.qlearn.epsilon -= (self.qlearn.initial_epsilon - self.qlearn.final_epsilon) / self.qlearn.explore            
+        #     Q_max, loss = self.qlearn.train_replay()
+        
+
+
+        if obs.last():
+            #self.qlearn.memory.add(self.episode_buf)
+            self.episode_buf = [] # Reset Episode Buf
+
+        # if len(self.episode_buf) > self.qlearn.trace_length:
+        #     # 1x8x64x64x3
+        #     state_series = np.array([trace[-1] for trace in self.episode_buf[-self.qlearn.trace_length:]])
+        #     state_series = np.expand_dims(state_series, axis=0)
+        #     rl_action  = self.qlearn.get_action(state_series)
+        # else:
+        #     rl_action = random.randrange(self.qlearn.action_size)
+        #rl_action = self.qlearn.choose_action(str(current_state))
+        rl_action = self.qlearn.act(current_state)
         smart_action = smart_actions[rl_action]
         
+        if(self.steps%100 == 0):
+            print("Epsilon " + str(self.qlearn.exploration_rate) + " Action " + smart_action)
+
         self.previous_killed_unit_score = killed_unit_score
         self.previous_killed_building_score = killed_building_score
         self.previous_state = current_state
