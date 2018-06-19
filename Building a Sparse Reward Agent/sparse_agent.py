@@ -46,6 +46,10 @@ ACTION_BUILD_BARRACKS = 'buildbarracks'
 ACTION_BUILD_MARINE = 'buildmarine'
 ACTION_ATTACK = 'attack'
 
+KILL_UNIT_REWARD = 1
+KILL_BUILDING_REWARD = 1
+BUILD_FIGHTING_UNIT_REWARD = 1
+
 smart_actions = [
     ACTION_DO_NOTHING,
     ACTION_BUILD_SUPPLY_DEPOT,
@@ -66,18 +70,21 @@ class SparseAgent(base_agent.BaseAgent):
         action_size = len(smart_actions)
         state_size = 8
         self.qlearn = qAgent(state_size = state_size, action_size = action_size)
+        self.steps_last_learn = 0
 
 
         self.previous_action = None
         self.previous_state = None
+        self.last_score = 0
         
         self.cc_y = None
         self.cc_x = None
         
         self.move_number = 0
-        
-        if os.path.isfile(DATA_FILE + '.gz'):
-            self.qlearn.q_table = pd.read_pickle(DATA_FILE + '.gz', compression='gzip')
+
+        self.last_killed_unit_score = 0
+        self.Last_killed_building_score = 0
+
         
     def transformDistance(self, x, x_distance, y, y_distance):
         if not self.base_top_left:
@@ -106,6 +113,8 @@ class SparseAgent(base_agent.BaseAgent):
         
         unit_type = obs.observation['screen'][_UNIT_TYPE]
 
+        
+
         if obs.first():
             player_y, player_x = (obs.observation['minimap'][_PLAYER_RELATIVE] == _PLAYER_SELF).nonzero()
             self.base_top_left = 1 if player_y.any() and player_y.mean() <= 31 else 0
@@ -121,52 +130,105 @@ class SparseAgent(base_agent.BaseAgent):
         barracks_y, barracks_x = (unit_type == _TERRAN_BARRACKS).nonzero()
         barracks_count = int(round(len(barracks_y) / 137))
 
+        supply_used = obs.observation['player'][3]
+        supply_limit = obs.observation['player'][4]
+        army_supply = obs.observation['player'][5]
+        worker_supply = obs.observation['player'][6]
+        
+        supply_free = supply_limit - supply_used
+
+        excluded_actions = []
+        if supply_depot_count == 2 or worker_supply == 0:
+            excluded_actions.append(1)
+            
+        if supply_depot_count == 0 or barracks_count == 2 or worker_supply == 0:
+            excluded_actions.append(2)
+
+        if supply_free == 0 or barracks_count == 0:
+            excluded_actions.append(3)
+            
+        if army_supply == 0:
+            excluded_actions.append(4)
+            excluded_actions.append(5)
+            excluded_actions.append(6)
+            excluded_actions.append(7)
+
+
         if obs.last():
-            reward = obs.reward
-            current_state = self.getCurrentState(obs, cc_count, supply_depot_count, barracks_count)
-            stateObject = [self.previous_state, self.previous_action, reward, current_state, obs.last()]
-            self.qlearn.memory.append(stateObject)
+            # current_state = self.getCurrentState(obs, cc_count, supply_depot_count, barracks_count)
+
+            # reward = 0
+            # if(obs.observation['score_cumulative'][0] < 6000):
+            #     reward = -1
+            # if(obs.observation['score_cumulative'][0] > 8000):
+            #     reward = 1
+
+            # stateObject = [self.previous_state, self.previous_action, reward, current_state, obs.last(), excluded_actions]
+            # if(not (self.previous_state == current_state).all()):
+            #     self.qlearn.memory_episode.append(stateObject)
+            # self.qlearn.replayTwo(len(self.qlearn.memory_episode), reward)
             #self.qlearn.learn(str(self.previous_state), self.previous_action, reward, 'terminal')
             
             #self.qlearn.q_table.to_pickle(DATA_FILE + '.gz', 'gzip')
-            
+            self.qlearn.target_train()
             self.previous_action = None
             self.previous_state = None
+            self.last_score = 0
             
             self.move_number = 0
+
+            self.last_killed_unit_score = 0
+            self.Last_killed_building_score = 0
             
             return actions.FunctionCall(_NO_OP, [])
             
         if self.move_number == 0:
             self.move_number += 1
-            return self.moveNumberZero(obs, cc_count, supply_depot_count, barracks_count, barracks_x, barracks_y, unit_type)
+            value = self.moveNumberZero(obs, cc_count, supply_depot_count, barracks_count, barracks_x, barracks_y, unit_type, excluded_actions)
+            return value
         
         elif self.move_number == 1:
             self.move_number += 1
-            return self.moveNumberOne(obs, supply_depot_count, barracks_count)
+            value =  self.moveNumberOne(obs, supply_depot_count, barracks_count)
+            return value
                 
         elif self.move_number == 2:
             self.move_number = 0
-            self.moveNumberTwo(obs, unit_type)
+            value =  self.moveNumberTwo(obs, unit_type)
+            return value
             
         
 
         
         return actions.FunctionCall(_NO_OP, [])
 
-    def moveNumberZero(self, obs, cc_count, supply_depot_count, barracks_count, barracks_x, barracks_y, unit_type):
-        self.move_number += 1
+    def moveNumberZero(self, obs, cc_count, supply_depot_count, barracks_count, barracks_x, barracks_y, unit_type, excluded_actions):
         
         current_state = self.getCurrentState(obs, cc_count, supply_depot_count, barracks_count)
 
         if self.previous_action is not None and not obs.last():
-            stateObject = [self.previous_state, self.previous_action, 0, current_state, obs.last()]
-            self.qlearn.memory.append(stateObject)
-            self.qlearn.replay(64)
+            killed_unit_score = obs.observation['score_cumulative'][5]
+            killed_building_score = obs.observation['score_cumulative'][6]
+            #rewardDiff = obs.observation['score_cumulative'][0] - self.last_score            
+            
+            #if(self.last_score is 0):
+                #reward = 0
+            self.last_score = obs.observation['score_cumulative'][0]
+            #reward = self.normalize(obs.observation['score_cumulative'][0], 0, 12000)
+            state_object = [self.previous_state, self.previous_action, 0, current_state, obs.last(), excluded_actions]
+            state_object = self.calculate_reward(state_object, self.last_killed_unit_score, killed_unit_score, self.Last_killed_building_score, killed_building_score)
+            self.last_killed_unit_score = killed_unit_score
+            self.Last_killed_building_score = killed_building_score
+            if(not (self.previous_state == current_state).all()):
+                self.qlearn.memory_episode.append(state_object)
+            self.steps_last_learn +=1
+            if(self.steps_last_learn > 400):
+                self.qlearn.replayTwo(500)
+                self.steps_last_learn = 0
             #self.qlearn.learn(str(self.previous_state), self.previous_action, 0, str(current_state))
     
         #rl_action = self.qlearn.choose_action(str(current_state))
-        rl_action = self.qlearn.act(current_state)
+        rl_action = self.qlearn.act(current_state, excluded_actions)
         self.previous_state = current_state
         self.previous_action = rl_action
     
@@ -192,7 +254,7 @@ class SparseAgent(base_agent.BaseAgent):
             if _SELECT_ARMY in obs.observation['available_actions']:
                 return actions.FunctionCall(_SELECT_ARMY, [_NOT_QUEUED])
 
-        raise Exception('(moveNumberZero)Undefined action: ' + smart_action)
+        return actions.FunctionCall(_NO_OP, [])
 
     def moveNumberOne(self, obs, supply_depot_count, barracks_count):
         smart_action, x, y = self.splitAction(self.previous_action)
@@ -235,7 +297,7 @@ class SparseAgent(base_agent.BaseAgent):
                 y_offset = random.randint(-1, 1)
                 
                 return actions.FunctionCall(_ATTACK_MINIMAP, [_NOT_QUEUED, self.transformLocation(int(x) + (x_offset * 8), int(y) + (y_offset * 8))])
-        raise Exception('(moveNumberOne)Undefined action: ' + smart_action)
+        return actions.FunctionCall(_NO_OP, [])
 
     def moveNumberTwo(self, obs, unit_type):
         smart_action, x, y = self.splitAction(self.previous_action)
@@ -253,14 +315,15 @@ class SparseAgent(base_agent.BaseAgent):
                     target = [int(m_x), int(m_y)]
                     
                     return actions.FunctionCall(_HARVEST_GATHER, [_QUEUED, target])
-        raise Exception('(moveNumberTwo)Undefined action: ' + smart_action)
+        return actions.FunctionCall(_NO_OP, [])
 
     def getCurrentState(self, obs, cc_count, supply_depot_count, barracks_count):
         current_state = np.zeros(8)
-        current_state[0] = cc_count
-        current_state[1] = supply_depot_count
-        current_state[2] = barracks_count
-        current_state[3] = obs.observation['player'][_ARMY_SUPPLY]
+        current_state[0] = self.normalize(cc_count, 0, 1)
+        current_state[1] = self.normalize(supply_depot_count, 0, 2)
+        current_state[2] = self.normalize(barracks_count, 0, 2)
+        army_supply = obs.observation['player'][_ARMY_SUPPLY]
+        current_state[3] = self.normalize(army_supply, 0, 19)
 
         hot_squares = np.zeros(4)        
         enemy_y, enemy_x = (obs.observation['minimap'][_PLAYER_RELATIVE] == _PLAYER_HOSTILE).nonzero()
@@ -268,11 +331,54 @@ class SparseAgent(base_agent.BaseAgent):
             y = int(math.ceil((enemy_y[i] + 1) / 32))
             x = int(math.ceil((enemy_x[i] + 1) / 32))
             
-            hot_squares[((y - 1) * 2) + (x - 1)] = 1
+            hot_squares[((y - 1) * 2) + (x - 1)] += 1
         
+        for i in range(len(hot_squares)):
+            hot_squares[i] = self.normalize(hot_squares[i], 0, 30)
+
         if not self.base_top_left:
             hot_squares = hot_squares[::-1]
         
         for i in range(0, 4):
             current_state[i + 4] = hot_squares[i]
         return current_state
+
+    def normalize(self, value, min, max):
+        value_loc = value
+        min_loc = min
+        max_loc = max
+
+        if(value_loc > max_loc):
+            value_loc = max_loc
+        if(value_loc < min_loc):
+            value_loc = min_loc
+
+        value_loc += (min * -1)
+        min_loc += (min * -1)
+        max_loc += (min * -1)
+
+        return ((value_loc / (max_loc-min_loc)) * 2) - 1
+
+    def calculate_reward(self, state_object, last_killed_units, killed_units, last_killed_buildings, killed_buildings):
+        reward = 0
+        if(killed_units > last_killed_units):
+            reward += KILL_UNIT_REWARD
+
+        if(killed_buildings > last_killed_buildings):
+            reward += KILL_BUILDING_REWARD
+
+        if(state_object[0][3] < 0.4 and state_object[1] != 3):
+            reward -= BUILD_FIGHTING_UNIT_REWARD
+
+        if(reward < -1):
+            reward = -1
+        if(reward > 1):
+            reward = 1
+        state_object[2] = reward
+
+        return state_object
+
+
+
+
+        
