@@ -1,3 +1,7 @@
+from collections import deque
+import numpy as np
+import random
+
 from keras.models import model_from_json
 from keras.models import Sequential, load_model, Model
 from keras.layers.core import Dense, Dropout, Activation, Flatten
@@ -8,15 +12,11 @@ from keras.layers.recurrent import LSTM, GRU
 from keras.layers.normalization import BatchNormalization
 from keras import backend as K
 
-import numpy as np
-import random
-from collections import deque
 
-from replayMemory import ReplayMemory
-
-class qAgent:
+class QqAgent:
+    """Deep Q Learning Network with target model and replay learning"""
     def __init__(self, state_size, action_size):
-        self.weight_backup      = "cartpole_weight.h5"
+        self.weight_backup      = "backup_v1.h5"
         self.state_size         = state_size
         self.action_size        = action_size
         self.memory             = deque(maxlen=16000)
@@ -33,8 +33,9 @@ class qAgent:
     def _build_model(self):
         # Neural Net for Deep-Q learning Model
         model = Sequential()
-        model.add(Dense(12, input_dim=self.state_size, activation='relu'))
-        model.add(Dense(12, activation='relu'))
+        model.add(Dense(96, input_dim=self.state_size, activation='relu'))
+        model.add(Dense(80, activation='relu'))
+        model.add(Dense(64, activation='relu'))
         model.add(Dense(self.action_size, activation='linear'))
         model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
         return model

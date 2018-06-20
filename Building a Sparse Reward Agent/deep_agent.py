@@ -9,7 +9,9 @@ from pysc2.agents import base_agent
 from pysc2.lib import actions
 from pysc2.lib import features
 
-from qAgent import qAgent
+from qAgent import QqAgent
+from map_matrix import MapMatrix
+from point_rect import Point
 
 _NO_OP = actions.FUNCTIONS.no_op.id
 _SELECT_POINT = actions.FUNCTIONS.select_point.id
@@ -57,19 +59,26 @@ smart_actions = [
     ACTION_BUILD_MARINE,
 ]
 
-for mm_x in range(0, 64):
-    for mm_y in range(0, 64):
-        if (mm_x + 1) % 32 == 0 and (mm_y + 1) % 32 == 0:
-            smart_actions.append(ACTION_ATTACK + '_' + str(mm_x - 16) + '_' + str(mm_y - 16))
+map_matrix = MapMatrix.get_eight_by_eight_matrix(64, 64)
+
+for height in range(8):
+    for width in range(8):
+        center_point = map_matrix[height][width].get_center()
+        smart_actions.append(ACTION_ATTACK + '_' + str(center_point.x) + '_' + str(center_point.y))
+# for mm_x in range(0, 64):
+#     for mm_y in range(0, 64):
+#         if (mm_x + 1) % 32 == 0 and (mm_y + 1) % 32 == 0:
+#             smart_actions.append(ACTION_ATTACK + '_' + str(mm_x - 16) + '_' + str(mm_y - 16))
+            
 
 
-class SparseAgent(base_agent.BaseAgent):
+class DeepAgent(base_agent.BaseAgent):
     def __init__(self):
         super(SparseAgent, self).__init__()
         
         action_size = len(smart_actions)
-        state_size = 8
-        self.qlearn = qAgent(state_size = state_size, action_size = action_size)
+        state_size = 68
+        self.qlearn = QqAgent(state_size = state_size, action_size = action_size)
         self.steps_last_learn = 0
 
 
@@ -87,14 +96,14 @@ class SparseAgent(base_agent.BaseAgent):
 
         
     def transformDistance(self, x, x_distance, y, y_distance):
-        if not self.base_top_left:
-            return [x - x_distance, y - y_distance]
+        # if not self.base_top_left:
+        #     return [x - x_distance, y - y_distance]
         
         return [x + x_distance, y + y_distance]
     
     def transformLocation(self, x, y):
-        if not self.base_top_left:
-            return [64 - x, 64 - y]
+        # if not self.base_top_left:
+        #     return [64 - x, 64 - y]
         
         return [x, y]
     
@@ -117,7 +126,7 @@ class SparseAgent(base_agent.BaseAgent):
 
         if obs.first():
             player_y, player_x = (obs.observation['minimap'][_PLAYER_RELATIVE] == _PLAYER_SELF).nonzero()
-            self.base_top_left = 1 if player_y.any() and player_y.mean() <= 31 else 0
+            #self.base_top_left = 1 if player_y.any() and player_y.mean() <= 31 else 0
         
             self.cc_y, self.cc_x = (unit_type == _TERRAN_COMMANDCENTER).nonzero()
 
@@ -296,7 +305,7 @@ class SparseAgent(base_agent.BaseAgent):
                 x_offset = random.randint(-1, 1)
                 y_offset = random.randint(-1, 1)
                 
-                return actions.FunctionCall(_ATTACK_MINIMAP, [_NOT_QUEUED, self.transformLocation(int(x) + (x_offset * 8), int(y) + (y_offset * 8))])
+                return actions.FunctionCall(_ATTACK_MINIMAP, [_NOT_QUEUED, self.transformLocation(int(x) + (x_offset * 2), int(y) + (y_offset * 2))])
         return actions.FunctionCall(_NO_OP, [])
 
     def moveNumberTwo(self, obs, unit_type):
@@ -318,30 +327,37 @@ class SparseAgent(base_agent.BaseAgent):
         return actions.FunctionCall(_NO_OP, [])
 
     def getCurrentState(self, obs, cc_count, supply_depot_count, barracks_count):
-        current_state = np.zeros(8)
-        current_state[0] = self.normalize(cc_count, 0, 1)
-        current_state[1] = self.normalize(supply_depot_count, 0, 2)
-        current_state[2] = self.normalize(barracks_count, 0, 2)
+        current_state = []
+        current_state.append(self.normalize(cc_count, 0, 1))
+        current_state.append(self.normalize(supply_depot_count, 0, 2))
+        current_state.append(self.normalize(barracks_count, 0, 2))
         army_supply = obs.observation['player'][_ARMY_SUPPLY]
-        current_state[3] = self.normalize(army_supply, 0, 19)
+        current_state.append(self.normalize(army_supply, 0, 19))
 
-        hot_squares = np.zeros(4)        
+        map_matrix_enemy = MapMatrix.get_eight_by_eight_matrix(64, 64)
+      
         enemy_y, enemy_x = (obs.observation['minimap'][_PLAYER_RELATIVE] == _PLAYER_HOSTILE).nonzero()
         for i in range(0, len(enemy_y)):
-            y = int(math.ceil((enemy_y[i] + 1) / 32))
-            x = int(math.ceil((enemy_x[i] + 1) / 32))
-            
-            hot_squares[((y - 1) * 2) + (x - 1)] += 1
+            enemy_position = Point(enemy_x[i] , enemy_y[i])
+            for height in range(8):
+                for width in range(8):
+                    if(map_matrix_enemy[height][width].contains(enemy_position)):
+                        map_matrix_enemy[height][width].value += 1
+                        break
         
-        for i in range(len(hot_squares)):
-            hot_squares[i] = self.normalize(hot_squares[i], 0, 30)
+        for height in range(8):
+            for width in range(8):
+                #normalize field to -1 to 1
+                current_state.append(self.normalize(map_matrix_enemy[height][width].value, 0, 30))
+        # for i in range(len(hot_squares)):
+        #     hot_squares[i] = self.normalize(hot_squares[i], 0, 30)
 
-        if not self.base_top_left:
-            hot_squares = hot_squares[::-1]
+        # if not self.base_top_left:
+        #     hot_squares = hot_squares[::-1]
         
-        for i in range(0, 4):
-            current_state[i + 4] = hot_squares[i]
-        return current_state
+        # for i in range(0, 4):
+        #     current_state[i + 4] = hot_squares[i]
+        return np.array(current_state)
 
     def normalize(self, value, min, max):
         value_loc = value

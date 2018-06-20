@@ -145,6 +145,8 @@ class Rect:
     def __init__(self, pt1, pt2):
         """Initialize a rectangle from two points."""
         self.set_points(pt1, pt2)
+        #added to store information in rect
+        self.value = 0
 
     def set_points(self, pt1, pt2):
         """Reset the rectangle coordinates."""
