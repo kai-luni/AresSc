@@ -13,7 +13,7 @@
       "console": "integratedTerminal",
       "args": [
         "--map", "Simple64",
-        "--agent", "sparse_agent.SparseAgent",
+        "--agent", "deep_agent.DeepAgent",
         "--agent_race", "T",
         "--max_agent_steps", "0"
       ],

@@ -9,7 +9,7 @@ from pysc2.agents import base_agent
 from pysc2.lib import actions
 from pysc2.lib import features
 
-from qAgent import QqAgent
+from q_agent import QqAgent
 from map_matrix import MapMatrix
 from point_rect import Point
 
@@ -74,7 +74,7 @@ for height in range(8):
 
 class DeepAgent(base_agent.BaseAgent):
     def __init__(self):
-        super(SparseAgent, self).__init__()
+        super(DeepAgent, self).__init__()
         
         action_size = len(smart_actions)
         state_size = 68
@@ -96,8 +96,8 @@ class DeepAgent(base_agent.BaseAgent):
 
         
     def transformDistance(self, x, x_distance, y, y_distance):
-        # if not self.base_top_left:
-        #     return [x - x_distance, y - y_distance]
+        if not self.base_top_left:
+            return [x - x_distance, y - y_distance]
         
         return [x + x_distance, y + y_distance]
     
@@ -118,7 +118,7 @@ class DeepAgent(base_agent.BaseAgent):
         return (smart_action, x, y)
         
     def step(self, obs):
-        super(SparseAgent, self).step(obs)
+        super(DeepAgent, self).step(obs)
         
         unit_type = obs.observation['screen'][_UNIT_TYPE]
 
@@ -126,7 +126,7 @@ class DeepAgent(base_agent.BaseAgent):
 
         if obs.first():
             player_y, player_x = (obs.observation['minimap'][_PLAYER_RELATIVE] == _PLAYER_SELF).nonzero()
-            #self.base_top_left = 1 if player_y.any() and player_y.mean() <= 31 else 0
+            self.base_top_left = 1 if player_y.any() and player_y.mean() <= 31 else 0
         
             self.cc_y, self.cc_x = (unit_type == _TERRAN_COMMANDCENTER).nonzero()
 
@@ -157,10 +157,9 @@ class DeepAgent(base_agent.BaseAgent):
             excluded_actions.append(3)
             
         if army_supply == 0:
-            excluded_actions.append(4)
-            excluded_actions.append(5)
-            excluded_actions.append(6)
-            excluded_actions.append(7)
+            for i in range(68):
+                if(i > 3):
+                    excluded_actions.append(i)        
 
 
         if obs.last():
@@ -305,7 +304,7 @@ class DeepAgent(base_agent.BaseAgent):
                 x_offset = random.randint(-1, 1)
                 y_offset = random.randint(-1, 1)
                 
-                return actions.FunctionCall(_ATTACK_MINIMAP, [_NOT_QUEUED, self.transformLocation(int(x) + (x_offset * 2), int(y) + (y_offset * 2))])
+                return actions.FunctionCall(_ATTACK_MINIMAP, [_NOT_QUEUED, self.transformLocation(float(x) + (x_offset * 2), float(y) + (y_offset * 2))])
         return actions.FunctionCall(_NO_OP, [])
 
     def moveNumberTwo(self, obs, unit_type):

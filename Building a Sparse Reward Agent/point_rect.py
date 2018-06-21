@@ -178,7 +178,7 @@ class Rect:
 
     def get_center(self):
         """return the center of rect as point"""
-        return Point(self.right-self.left, self.top-self.bottom)
+        return Point(self.left + ((self.right-self.left)/2), self.top + ((self.bottom-self.top)/2))
     
     def expanded_by(self, n):
         """Return a rectangle with extended borders.
