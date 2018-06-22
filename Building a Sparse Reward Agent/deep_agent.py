@@ -12,6 +12,7 @@ from pysc2.lib import features
 from q_agent import QqAgent
 from map_matrix import MapMatrix
 from point_rect import Point
+from reward.reward_calculator import RewardCalculator
 
 _NO_OP = actions.FUNCTIONS.no_op.id
 _SELECT_POINT = actions.FUNCTIONS.select_point.id
@@ -48,10 +49,6 @@ ACTION_BUILD_BARRACKS = 'buildbarracks'
 ACTION_BUILD_MARINE = 'buildmarine'
 ACTION_ATTACK = 'attack'
 
-KILL_UNIT_REWARD = 0.5
-KILL_BUILDING_REWARD = 1
-BUILD_FIGHTING_UNIT_REWARD = 0.5
-
 smart_actions = [
     ACTION_DO_NOTHING,
     ACTION_BUILD_SUPPLY_DEPOT,
@@ -65,17 +62,13 @@ for height in range(8):
     for width in range(8):
         center_point = map_matrix[height][width].get_center()
         smart_actions.append(ACTION_ATTACK + '_' + str(center_point.x) + '_' + str(center_point.y))
-# for mm_x in range(0, 64):
-#     for mm_y in range(0, 64):
-#         if (mm_x + 1) % 32 == 0 and (mm_y + 1) % 32 == 0:
-#             smart_actions.append(ACTION_ATTACK + '_' + str(mm_x - 16) + '_' + str(mm_y - 16))
-            
-
 
 class DeepAgent(base_agent.BaseAgent):
     def __init__(self):
         super(DeepAgent, self).__init__()
         
+        self.reward_calc = RewardCalculator()
+
         action_size = len(smart_actions)
         state_size = 68
         self.qlearn = QqAgent(state_size = state_size, action_size = action_size)
@@ -204,14 +197,10 @@ class DeepAgent(base_agent.BaseAgent):
             self.move_number = 0
             value =  self.moveNumberTwo(obs, unit_type)
             return value
-            
-        
 
-        
         return actions.FunctionCall(_NO_OP, [])
 
-    def moveNumberZero(self, obs, cc_count, supply_depot_count, barracks_count, barracks_x, barracks_y, unit_type, excluded_actions):
-        
+    def moveNumberZero(self, obs, cc_count, supply_depot_count, barracks_count, barracks_x, barracks_y, unit_type, excluded_actions):        
         current_state = self.getCurrentState(obs, cc_count, supply_depot_count, barracks_count)
 
         if self.previous_action is not None and not obs.last():
@@ -222,7 +211,7 @@ class DeepAgent(base_agent.BaseAgent):
             #if(self.last_score is 0):
                 #reward = 0
             self.last_score = obs.observation['score_cumulative'][0]
-            #reward = self.normalize(obs.observation['score_cumulative'][0], 0, 12000)
+            reward = reward_calc.get_reward_from_observation(obs)
             state_object = [self.previous_state, self.previous_action, 0, current_state, obs.last(), excluded_actions]
             state_object = self.calculate_reward(state_object, self.last_killed_unit_score, killed_unit_score, self.Last_killed_building_score, killed_building_score)
             self.last_killed_unit_score = killed_unit_score
@@ -358,40 +347,26 @@ class DeepAgent(base_agent.BaseAgent):
         #     current_state[i + 4] = hot_squares[i]
         return np.array(current_state)
 
-    def normalize(self, value, min, max):
-        value_loc = value
-        min_loc = min
-        max_loc = max
 
-        if(value_loc > max_loc):
-            value_loc = max_loc
-        if(value_loc < min_loc):
-            value_loc = min_loc
 
-        value_loc += (min * -1)
-        min_loc += (min * -1)
-        max_loc += (min * -1)
+    # def calculate_reward(self, state_object, last_killed_units, killed_units, last_killed_buildings, killed_buildings):
+    #     reward = 0
+    #     if(killed_units > last_killed_units):
+    #         reward += KILL_UNIT_REWARD
 
-        return ((value_loc / (max_loc-min_loc)) * 2) - 1
+    #     if(killed_buildings > last_killed_buildings):
+    #         reward += KILL_BUILDING_REWARD
 
-    def calculate_reward(self, state_object, last_killed_units, killed_units, last_killed_buildings, killed_buildings):
-        reward = 0
-        if(killed_units > last_killed_units):
-            reward += KILL_UNIT_REWARD
+    #     if(state_object[0][3] < 0.4 and state_object[1] != 3):
+    #         reward -= BUILD_FIGHTING_UNIT_REWARD
 
-        if(killed_buildings > last_killed_buildings):
-            reward += KILL_BUILDING_REWARD
+    #     if(reward < -1):
+    #         reward = -1
+    #     if(reward > 1):
+    #         reward = 1
+    #     state_object[2] = reward
 
-        if(state_object[0][3] < 0.4 and state_object[1] != 3):
-            reward -= BUILD_FIGHTING_UNIT_REWARD
-
-        if(reward < -1):
-            reward = -1
-        if(reward > 1):
-            reward = 1
-        state_object[2] = reward
-
-        return state_object
+    #     return state_object
 
 
 

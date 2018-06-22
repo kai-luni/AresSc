@@ -6,5 +6,5 @@
     // whitelist numpy to remove lint errors
     "python.linting.pylintArgs": [ "--ignored-modules=numpy", "--ignored-classes=numpy", "--extension-pkg-whitelist=numpy"],
     "python.linting.pylintPath": "pylint",
-    "python.pythonPath": "/media/kaidahousecat/FutureForrect/Anaconda3/envs/tensorflow/bin/python"
+    "python.pythonPath": "d:\\Anaconda3\\python.exe"
 }
