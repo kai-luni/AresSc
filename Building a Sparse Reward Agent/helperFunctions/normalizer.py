@@ -14,8 +14,9 @@ def normalize(value, min_val, max_val):
     if(value_loc < min_loc):
         value_loc = min_loc
 
-    value_loc += (min * -1)
-    min_loc += (min * -1)
-    max_loc += (min * -1)
+    value_loc += (min_loc * -1)
+    min_loc += (min_loc * -1)
+    max_loc += (min_loc * -1)
 
     return ((value_loc / (max_loc-min_loc)) * 2) - 1
+    

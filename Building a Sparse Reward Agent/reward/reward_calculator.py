@@ -1,14 +1,14 @@
-from kdh_state_dto import KdhStateDto
-from helper.normalizer import normalize
+from reward.kdh_state_dto import KdhStateDto
+from helperFunctions.normalizer import normalize
 
 from pysc2.lib import features
 
-KILL_UNIT_REWARD = 0.5
-KILL_BUILDING_REWARD = 1
+KILL_UNIT_REWARD = 0.4
+KILL_BUILDING_REWARD = 0.8
 BUILD_FIGHTING_UNIT_REWARD = 0.2
-BUILD_IMPORTANT_BUILDING_REWARD = 0.2
+BUILD_IMPORTANT_BUILDING_REWARD = 0.6
 
-LOOSE_BUILDING_PENALTY = -0.5
+LOOSE_BUILDING_PENALTY = -0.0
 LOOSE_FIGHTING_UNIT_PENALTY = -0.3
 
 _TERRAN_COMMANDCENTER = 18
@@ -42,6 +42,12 @@ class RewardCalculator:
         if(kdh_state.own_buildings < self.last_kdh_state.own_buildings):
             reward += LOOSE_BUILDING_PENALTY
 
+        if(kdh_state.own_barracks < 2 and kdh_state.action == 2):
+            reward += BUILD_IMPORTANT_BUILDING_REWARD
+
+        if(kdh_state.own_depot < 2 and kdh_state.action == 1):
+            reward += BUILD_IMPORTANT_BUILDING_REWARD
+
         if(reward < -1):
             reward = -1
         if(reward > 1):
@@ -67,6 +73,8 @@ class RewardCalculator:
         barracks_y, barracks_x = (unit_type == _TERRAN_BARRACKS).nonzero()
         barracks_count = int(round(len(barracks_y) / 137))
 
+        state_dto.own_barracks = barracks_count
+        state_dto.own_depot = supply_depot_count
         state_dto.own_buildings = normalize(cc_count + supply_depot_count + barracks_count, 0, 5)
 
 

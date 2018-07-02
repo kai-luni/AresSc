@@ -24,7 +24,8 @@ class QqAgent:
         self.gamma              = 0.98
         self.exploration_rate   = 1.0
         self.exploration_min    = 0.01
-        self.exploration_decay  = 0.99
+
+        self.exploration_decay  = 0.995
         self.brain              = self._build_model(state_size_one,state_matrix_enemies_size, action_size)
         # "hack" implemented by DeepMind to improve convergence
         self.target_model       = self._build_model(state_size_one,state_matrix_enemies_size, action_size)

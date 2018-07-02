@@ -12,9 +12,10 @@ from pysc2.lib import actions
 from pysc2.lib import features
 
 from q_agent import QqAgent
-from map_matrix import MapMatrix
+from map_matrix import get_eight_by_eight_matrix
 from point_rect import Point
 from reward.reward_calculator import RewardCalculator
+from helperFunctions.normalizer import normalize
 
 _NO_OP = actions.FUNCTIONS.no_op.id
 _SELECT_POINT = actions.FUNCTIONS.select_point.id
@@ -58,7 +59,7 @@ smart_actions = [
     ACTION_BUILD_MARINE,
 ]
 
-map_matrix = MapMatrix.get_eight_by_eight_matrix(64, 64)
+map_matrix = get_eight_by_eight_matrix(64, 64)
 
 for height in range(8):
     for width in range(8):
@@ -79,6 +80,7 @@ class DeepAgent(base_agent.BaseAgent):
 
         self.previous_action = None
         self.previous_state = None
+        self.previous_obs = None
         self.last_score = 0
         
         self.cc_y = None
@@ -148,6 +150,7 @@ class DeepAgent(base_agent.BaseAgent):
         if supply_depot_count == 0 or barracks_count == 2 or worker_supply == 0:
             excluded_actions.append(2)
 
+        #TODO: when building is not finished building its counted here already
         if supply_free == 0 or barracks_count == 0:
             excluded_actions.append(3)
             
@@ -158,7 +161,7 @@ class DeepAgent(base_agent.BaseAgent):
 
 
         if obs.last():
-            # current_state = self.getCurrentState(obs, cc_count, supply_depot_count, barracks_count)
+            current_state = self.getCurrentState(obs, cc_count, supply_depot_count, barracks_count)
 
             # reward = 0
             # if(obs.observation['score_cumulative'][0] < 6000):
@@ -166,9 +169,9 @@ class DeepAgent(base_agent.BaseAgent):
             # if(obs.observation['score_cumulative'][0] > 8000):
             #     reward = 1
 
-            # stateObject = [self.previous_state, self.previous_action, reward, current_state, obs.last(), excluded_actions]
+            stateObject = [self.previous_state, self.previous_action, obs.reward, current_state, obs.last(), excluded_actions]
             # if(not (self.previous_state == current_state).all()):
-            #     self.qlearn.memory_episode.append(stateObject)
+            self.qlearn.memory_episode.append(stateObject)
             # self.qlearn.replayTwo(len(self.qlearn.memory_episode), reward)
             #self.qlearn.learn(str(self.previous_state), self.previous_action, reward, 'terminal')
             
@@ -176,6 +179,7 @@ class DeepAgent(base_agent.BaseAgent):
             self.qlearn.target_train()
             self.previous_action = None
             self.previous_state = None
+            self.previous_obs = None
             self.last_score = 0
             
             self.move_number = 0
@@ -213,13 +217,14 @@ class DeepAgent(base_agent.BaseAgent):
             #if(self.last_score is 0):
                 #reward = 0
             self.last_score = obs.observation['score_cumulative'][0]
-            reward = reward_calc.get_reward_from_observation(obs)
-            state_object = [self.previous_state, self.previous_action, 0, current_state, obs.last(), excluded_actions]
-            state_object = self.calculate_reward(state_object, self.last_killed_unit_score, killed_unit_score, self.Last_killed_building_score, killed_building_score)
+            reward = self.reward_calc.get_reward_from_observation(self.previous_obs, self.previous_action)
+            state_object = [self.previous_state, self.previous_action, reward, current_state, obs.last(), excluded_actions]
+            #state_object = self.calculate_reward(state_object, self.last_killed_unit_score, killed_unit_score, self.Last_killed_building_score, killed_building_score)
             self.last_killed_unit_score = killed_unit_score
             self.Last_killed_building_score = killed_building_score
-            # if(not (self.previous_state == current_state).all()):
-            #     self.qlearn.memory_episode.append(state_object)
+
+            self.qlearn.memory_episode.append(state_object)
+
             self.steps_last_learn +=1
             if(self.steps_last_learn > 400):
                 self.qlearn.replayTwo(500)
@@ -229,6 +234,7 @@ class DeepAgent(base_agent.BaseAgent):
         #rl_action = self.qlearn.choose_action(str(current_state))
         rl_action = self.qlearn.act(current_state, excluded_actions)
         self.previous_state = current_state
+        self.previous_obs = obs
         self.previous_action = rl_action
     
         smart_action, x, y = self.splitAction(self.previous_action)
@@ -318,13 +324,13 @@ class DeepAgent(base_agent.BaseAgent):
 
     def getCurrentState(self, obs, cc_count, supply_depot_count, barracks_count):
         current_state = []
-        current_state.append(self.normalize(cc_count, 0, 1))
-        current_state.append(self.normalize(supply_depot_count, 0, 2))
-        current_state.append(self.normalize(barracks_count, 0, 2))
+        current_state.append(normalize(cc_count, 0, 1))
+        current_state.append(normalize(supply_depot_count, 0, 2))
+        current_state.append(normalize(barracks_count, 0, 2))
         army_supply = obs.observation['player'][_ARMY_SUPPLY]
-        current_state.append(self.normalize(army_supply, 0, 19))
+        current_state.append(normalize(army_supply, 0, 19))
 
-        map_matrix_enemy = MapMatrix.get_eight_by_eight_matrix(64, 64)
+        map_matrix_enemy = get_eight_by_eight_matrix(64, 64)
       
         enemy_y, enemy_x = (obs.observation['minimap'][_PLAYER_RELATIVE] == _PLAYER_HOSTILE).nonzero()
         for i in range(0, len(enemy_y)):
@@ -334,6 +340,7 @@ class DeepAgent(base_agent.BaseAgent):
                     if(map_matrix_enemy[height][width].contains(enemy_position)):
                         map_matrix_enemy[height][width].value += 1
                         break
+						
         np_array_enemies = np.array(map_matrix_enemy).reshape(8,8,1)
         # for height in range(8):
         #     for width in range(8):
@@ -343,6 +350,7 @@ class DeepAgent(base_agent.BaseAgent):
         return_dict["state_enemy_matrix"] = np_array_enemies
         return_dict["state_others"] = np.array(current_state)
         return return_dict
+
 
 
 

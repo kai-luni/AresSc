@@ -7,6 +7,7 @@ def test_map_matrix():
     """test the module map_matrix"""
     matrix = MapMatrix.get_eight_by_eight_matrix(64, 64)
 
+
     if(matrix[0][0].overlaps(matrix[0][1])):
         raise Exception("map matrix fields should not overlap")
 
