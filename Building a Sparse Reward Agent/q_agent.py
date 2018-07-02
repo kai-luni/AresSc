@@ -6,7 +6,7 @@ from keras.models import model_from_json
 from keras.models import Sequential, load_model, Model
 from keras.layers.core import Dense, Dropout, Activation, Flatten
 from keras.layers.wrappers import TimeDistributed
-from keras.layers import Convolution2D, Dense, Flatten, merge, MaxPooling2D, Input, AveragePooling2D, Lambda, Activation, Embedding
+from keras.layers import Conv2D, Dense, Flatten, merge, MaxPooling2D, Input, AveragePooling2D, Lambda, Activation, Embedding, concatenate
 from keras.optimizers import SGD, Adam, rmsprop
 from keras.layers.recurrent import LSTM, GRU
 from keras.layers.normalization import BatchNormalization
@@ -15,9 +15,8 @@ from keras import backend as K
 
 class QqAgent:
     """Deep Q Learning Network with target model and replay learning"""
-    def __init__(self, state_size, action_size):
+    def __init__(self, state_size_one, state_matrix_enemies_size, action_size):
         self.weight_backup      = "backup_v1.h5"
-        self.state_size         = state_size
         self.action_size        = action_size
         self.memory             = deque(maxlen=16000)
         self.memory_episode     = deque()
@@ -26,19 +25,42 @@ class QqAgent:
         self.exploration_rate   = 1.0
         self.exploration_min    = 0.01
         self.exploration_decay  = 0.99
-        self.brain              = self._build_model()
+        self.brain              = self._build_model(state_size_one,state_matrix_enemies_size, action_size)
         # "hack" implemented by DeepMind to improve convergence
-        self.target_model       = self._build_model()
+        self.target_model       = self._build_model(state_size_one,state_matrix_enemies_size, action_size)
 
-    def _build_model(self):
-        # Neural Net for Deep-Q learning Model
-        model = Sequential()
-        model.add(Dense(96, input_dim=self.state_size, activation='relu'))
-        model.add(Dense(80, activation='relu'))
-        model.add(Dense(64, activation='relu'))
-        model.add(Dense(self.action_size, activation='linear'))
+    def _build_model(self, state_size, shape_enemy_map, action_size):
+        #data collected from pysc2 is inserted here
+        input_one = Input(shape=(state_size,), name='input_one')
+
+        #map of enemies
+        input_enemies = Input(shape=(8,8,1), name='input_enemies')     	
+        conv_one = Conv2D(4, (3, 3), activation='relu', input_shape=(8,8,1))(input_enemies)
+        conv_two = Conv2D(6, (3, 3), activation='relu')(conv_one)
+        conv_three = Conv2D(8, (3, 3), activation='relu')(conv_two)
+        out_conv = Flatten()(conv_three)
+
+
+        #merged = Concatenate([model_other_data, model_map_enemies])
+        merged = concatenate([input_one, out_conv])
+        output_one = Dense(36, activation='relu')(merged)
+        output_two = Dense(50, activation='relu')(output_one)
+        output_three = Dense(action_size, activation='relu')(output_two)
+
+        model = Model([input_one, input_enemies], output_three)
+
         model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
-        return model
+        print("finished")
+        print(model.summary())
+
+        # Neural Net for Deep-Q learning Model
+        # model = Sequential()
+        # model.add(Dense(96, input_dim=self.state_size, activation='relu'))
+        # model.add(Dense(80, activation='relu'))
+        # model.add(Dense(64, activation='relu'))
+        # model.add(Dense(self.action_size, activation='linear'))
+        # model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
+        # return model
 
     def act(self, state, excluded_actions):
 
@@ -51,7 +73,9 @@ class QqAgent:
             rand_action = random.randrange(len(allowed_actions))
 
             return allowed_actions[rand_action]
-        act_values = self.brain.predict(np.reshape(state, [1, len(state)]))[0]
+        #act_values = self.brain.predict(np.reshape(state, [1, len(state)]))[0]
+        
+        act_values = self.brain.predict([state["state_others"], state["state_enemy_matrix"]])
 
         act_values = self.get_max_after_exclude(act_values, excluded_actions)
 
@@ -89,18 +113,20 @@ class QqAgent:
 
         minibatch = random.sample(self.memory, sample_batch_size)
 
-        inputs = []   #32, 80, 80, 4
+        input_others = []
+        input_enemy_matrix = []
         targets = []  #32, 2
 
         for state_t, action_t, reward_t, state_t1, terminal, disallowed_actions in minibatch:
-            inputs.append(state_t)
+            input_others.append(state_t["state_others"])
+            input_enemy_matrix.append(state_t["state_enemy_matrix"])
             
-            expected_future_rewards = self.target_model.predict(np.reshape(state_t1, [1, len(state_t1)]))[0]
+            expected_future_rewards = self.target_model.predict([state_t1["state_others"], state_t1["state_enemy_matrix"]])[0]
 
             expected_future_rewards = self.get_max_after_exclude(expected_future_rewards, disallowed_actions)
 
             #exclude invalid actions
-            target_prediction = self.target_model.predict(np.reshape(state_t, [1, len(state_t)]))[0]
+            target_prediction = self.target_model.predict([state_t["state_others"], state_t["state_enemy_matrix"]])[0]
 
             if terminal:
                 target_prediction[action_t] = reward_t
@@ -111,7 +137,7 @@ class QqAgent:
 
             targets.append(target_prediction)
         
-        self.brain.train_on_batch(np.array(inputs), np.array(targets))
+        self.brain.train_on_batch([input_others, input_enemy_matrix], np.array(targets))
         
 
         if self.exploration_rate > self.exploration_min:

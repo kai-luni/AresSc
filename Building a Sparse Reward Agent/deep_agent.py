@@ -1,3 +1,5 @@
+"""Main Module which is executed by the Pysc2 library"""
+
 import random
 import math
 import os.path
@@ -216,8 +218,8 @@ class DeepAgent(base_agent.BaseAgent):
             state_object = self.calculate_reward(state_object, self.last_killed_unit_score, killed_unit_score, self.Last_killed_building_score, killed_building_score)
             self.last_killed_unit_score = killed_unit_score
             self.Last_killed_building_score = killed_building_score
-            if(not (self.previous_state == current_state).all()):
-                self.qlearn.memory_episode.append(state_object)
+            # if(not (self.previous_state == current_state).all()):
+            #     self.qlearn.memory_episode.append(state_object)
             self.steps_last_learn +=1
             if(self.steps_last_learn > 400):
                 self.qlearn.replayTwo(500)
@@ -332,20 +334,15 @@ class DeepAgent(base_agent.BaseAgent):
                     if(map_matrix_enemy[height][width].contains(enemy_position)):
                         map_matrix_enemy[height][width].value += 1
                         break
-        
-        for height in range(8):
-            for width in range(8):
-                #normalize field to -1 to 1
-                current_state.append(self.normalize(map_matrix_enemy[height][width].value, 0, 30))
-        # for i in range(len(hot_squares)):
-        #     hot_squares[i] = self.normalize(hot_squares[i], 0, 30)
-
-        # if not self.base_top_left:
-        #     hot_squares = hot_squares[::-1]
-        
-        # for i in range(0, 4):
-        #     current_state[i + 4] = hot_squares[i]
-        return np.array(current_state)
+        np_array_enemies = np.array(map_matrix_enemy).reshape(8,8,1)
+        # for height in range(8):
+        #     for width in range(8):
+        #         #normalize field to -1 to 1
+        #         current_state.append(self.normalize(map_matrix_enemy[height][width].value, 0, 30))
+        return_dict = {}
+        return_dict["state_enemy_matrix"] = np_array_enemies
+        return_dict["state_others"] = np.array(current_state)
+        return return_dict
 
 
 
