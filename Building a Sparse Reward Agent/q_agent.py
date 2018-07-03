@@ -1,3 +1,4 @@
+"""deep q learning algorith created with keras"""
 from collections import deque
 import numpy as np
 import random
@@ -35,7 +36,7 @@ class QqAgent:
         input_one = Input(shape=(state_size,), name='input_one')
 
         #map of enemies
-        input_enemies = Input(shape=(8,8,1), name='input_enemies')     	
+        input_enemies = Input(shape=shape_enemy_map, name='input_enemies')     	
         conv_one = Conv2D(4, (3, 3), activation='relu', input_shape=(8,8,1))(input_enemies)
         conv_two = Conv2D(6, (3, 3), activation='relu')(conv_one)
         conv_three = Conv2D(8, (3, 3), activation='relu')(conv_two)
@@ -51,8 +52,9 @@ class QqAgent:
         model = Model([input_one, input_enemies], output_three)
 
         model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
-        print("finished")
-        print(model.summary())
+        return model
+        # print("finished")
+        # print(model.summary())
 
         # Neural Net for Deep-Q learning Model
         # model = Sequential()
@@ -76,7 +78,7 @@ class QqAgent:
             return allowed_actions[rand_action]
         #act_values = self.brain.predict(np.reshape(state, [1, len(state)]))[0]
         
-        act_values = self.brain.predict([state["state_others"], state["state_enemy_matrix"]])
+        act_values = self.brain.predict([np.reshape(state["state_others"], [1, len(state["state_others"])]), np.reshape(state["state_enemy_matrix"], (1, 8, 8, 1))])
 
         act_values = self.get_max_after_exclude(act_values, excluded_actions)
 
@@ -122,12 +124,12 @@ class QqAgent:
             input_others.append(state_t["state_others"])
             input_enemy_matrix.append(state_t["state_enemy_matrix"])
             
-            expected_future_rewards = self.target_model.predict([state_t1["state_others"], state_t1["state_enemy_matrix"]])[0]
+            expected_future_rewards = self.target_model.predict([np.reshape(state_t1["state_others"], [1, len(state_t1["state_others"])]), np.reshape(state_t1["state_enemy_matrix"], (1, 8, 8, 1))])[0]
 
             expected_future_rewards = self.get_max_after_exclude(expected_future_rewards, disallowed_actions)
 
             #exclude invalid actions
-            target_prediction = self.target_model.predict([state_t["state_others"], state_t["state_enemy_matrix"]])[0]
+            target_prediction = self.target_model.predict([np.reshape(state_t["state_others"], [1, len(state_t["state_others"])]), np.reshape(state_t1["state_enemy_matrix"], (1, 8, 8, 1))])[0]
 
             if terminal:
                 target_prediction[action_t] = reward_t

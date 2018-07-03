@@ -35,7 +35,7 @@ _PLAYER_HOSTILE = 4
 _ARMY_SUPPLY = 5
 
 _TERRAN_COMMANDCENTER = 18
-_TERRAN_SCV = 45 
+_TERRAN_SCV = 45
 _TERRAN_SUPPLY_DEPOT = 19
 _TERRAN_BARRACKS = 21
 _NEUTRAL_MINERAL_FIELD = 341
@@ -59,22 +59,22 @@ smart_actions = [
     ACTION_BUILD_MARINE,
 ]
 
-map_matrix = get_eight_by_eight_matrix(64, 64)
+MAP_MATRIX = get_eight_by_eight_matrix(64, 64)
 
 for height in range(8):
     for width in range(8):
-        center_point = map_matrix[height][width].get_center()
+        center_point = MAP_MATRIX[height][width].get_center()
         smart_actions.append(ACTION_ATTACK + '_' + str(center_point.x) + '_' + str(center_point.y))
 
 class DeepAgent(base_agent.BaseAgent):
     def __init__(self):
         super(DeepAgent, self).__init__()
-        
+
         self.reward_calc = RewardCalculator()
 
         action_size = len(smart_actions)
-        state_size = 68
-        self.qlearn = QqAgent(state_size = state_size, action_size = action_size)
+        state_size = 4
+        self.qlearn = QqAgent(state_size_one=state_size, state_matrix_enemies_size=(8, 8, 1), action_size=action_size)
         self.steps_last_learn = 0
 
 
@@ -340,12 +340,14 @@ class DeepAgent(base_agent.BaseAgent):
                     if(map_matrix_enemy[height][width].contains(enemy_position)):
                         map_matrix_enemy[height][width].value += 1
                         break
-						
+
+        #TODO own object
+        for height in range(8):
+            for width in range(8):
+                #normalize field to -1 to 1
+                map_matrix_enemy[height][width] = normalize(map_matrix_enemy[height][width].value, 0, 30)
+
         np_array_enemies = np.array(map_matrix_enemy).reshape(8,8,1)
-        # for height in range(8):
-        #     for width in range(8):
-        #         #normalize field to -1 to 1
-        #         current_state.append(self.normalize(map_matrix_enemy[height][width].value, 0, 30))
         return_dict = {}
         return_dict["state_enemy_matrix"] = np_array_enemies
         return_dict["state_others"] = np.array(current_state)
