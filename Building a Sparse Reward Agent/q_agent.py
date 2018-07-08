@@ -1,9 +1,12 @@
 """deep q learning algorith created with keras"""
 from collections import deque
-import numpy as np
+
 import random
 
-from keras.models import model_from_json
+import pickle
+import numpy as np
+import os.path
+
 from keras.models import Sequential, load_model, Model
 from keras.layers.core import Dense, Dropout, Activation, Flatten
 from keras.layers.wrappers import TimeDistributed
@@ -23,15 +26,17 @@ class QqAgent:
         self.memory_episode     = deque()
         self.learning_rate      = 0.01
         self.gamma              = 0.98
-        self.exploration_rate   = 1.0
         self.exploration_min    = 0.01
 
         self.exploration_decay  = 0.995
-        self.brain              = self._build_model(state_size_one,state_matrix_enemies_size, action_size)
-        # "hack" implemented by DeepMind to improve convergence
-        self.target_model       = self._build_model(state_size_one,state_matrix_enemies_size, action_size)
+        if(not self.try_load_model()):
+            self.exploration_rate   = 1.0
+            self.brain              = self._build_model(state_size_one,state_matrix_enemies_size, action_size)
+            # "hack" implemented by DeepMind to improve convergence
+            self.target_model       = self._build_model(state_size_one,state_matrix_enemies_size, action_size)
 
     def _build_model(self, state_size, shape_enemy_map, action_size):
+
         #data collected from pysc2 is inserted here
         input_one = Input(shape=(state_size,), name='input_one')
 
@@ -42,8 +47,6 @@ class QqAgent:
         conv_three = Conv2D(8, (3, 3), activation='relu')(conv_two)
         out_conv = Flatten()(conv_three)
 
-
-        #merged = Concatenate([model_other_data, model_map_enemies])
         merged = concatenate([input_one, out_conv])
         output_one = Dense(36, activation='relu')(merged)
         output_two = Dense(50, activation='relu')(output_one)
@@ -53,19 +56,13 @@ class QqAgent:
 
         model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
         return model
-        # print("finished")
-        # print(model.summary())
 
-        # Neural Net for Deep-Q learning Model
-        # model = Sequential()
-        # model.add(Dense(96, input_dim=self.state_size, activation='relu'))
-        # model.add(Dense(80, activation='relu'))
-        # model.add(Dense(64, activation='relu'))
-        # model.add(Dense(self.action_size, activation='linear'))
-        # model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
-        # return model
 
     def act(self, state, excluded_actions):
+        """
+        ask the model what to do
+        excluded_actions: this actions will be excluded from the valid actions
+        """
 
         if state is None or np.random.rand() <= self.exploration_rate:
             allowed_actions = []
@@ -80,34 +77,24 @@ class QqAgent:
         
         act_values = self.brain.predict([np.reshape(state["state_others"], [1, len(state["state_others"])]), np.reshape(state["state_enemy_matrix"], (1, 8, 8, 1))])
 
-        act_values = self.get_max_after_exclude(act_values, excluded_actions)
+        act_values = self.minimize_excluded(act_values, excluded_actions)
 
         return np.argmax(act_values)
 
 
   
     def target_train(self):
-            weights = self.brain.get_weights()
-            target_weights = self.target_model.get_weights()
-            for i in range(len(target_weights)):
-                target_weights[i] = weights[i]
-            self.target_model.set_weights(target_weights)    
+        """copy weights to target network"""
+        weights = self.brain.get_weights()
+        target_weights = self.target_model.get_weights()
+        for i in range(len(target_weights)):
+            target_weights[i] = weights[i]
+        self.target_model.set_weights(target_weights)    
 
 
 
-    def replayTwo(self, sample_batch_size):
-
-        # for entry in reversed(self.memory_episode):
-        #     entry[2] = reward
-        #     reward *= self.gamma
-        #     if(abs(reward) < 0.1):
-        #         break
-        # if(reward is not None):
-        #     for i in reversed(range(len(self.memory_episode))):
-        #         self.memory_episode[i][2] = reward
-        #         # reward *= self.gamma
-        #         # if(abs(reward) < 0.1):
-        #         #     break
+    def replay(self, sample_batch_size):
+        """data replay to train the model"""
         self.memory.extend(self.memory_episode)
         self.memory_episode = deque()
 
@@ -125,8 +112,7 @@ class QqAgent:
             input_enemy_matrix.append(state_t["state_enemy_matrix"])
             
             expected_future_rewards = self.target_model.predict([np.reshape(state_t1["state_others"], [1, len(state_t1["state_others"])]), np.reshape(state_t1["state_enemy_matrix"], (1, 8, 8, 1))])[0]
-
-            expected_future_rewards = self.get_max_after_exclude(expected_future_rewards, disallowed_actions)
+            expected_future_rewards = self.minimize_excluded(expected_future_rewards, disallowed_actions)
 
             #exclude invalid actions
             target_prediction = self.target_model.predict([np.reshape(state_t["state_others"], [1, len(state_t["state_others"])]), np.reshape(state_t1["state_enemy_matrix"], (1, 8, 8, 1))])[0]
@@ -135,8 +121,6 @@ class QqAgent:
                 target_prediction[action_t] = reward_t
             else:
                 target_prediction[action_t] = (reward_t + self.gamma * np.max(expected_future_rewards))
-
-            #target_prediction[action_t] = min(target_prediction[action_t], 1)
 
             targets.append(target_prediction)
         
@@ -147,10 +131,33 @@ class QqAgent:
             self.exploration_rate *= self.exploration_decay
             print(str(self.exploration_rate))
 
-    def get_max_after_exclude(self, predictions, excluded_indexes):
+    def minimize_excluded(self, predictions, excluded_indexes):
+        """minimize the indexes from excluded_indexes, by making them small they are ignored"""
         min_value = np.amin(predictions) - 1
         for i in range(len(predictions)):
             if(i in excluded_indexes):
                 predictions[i] = min_value
         return predictions
+
+    def try_load_model(self):
+        """
+        load everything important related to the model
+        returns false if model not loaded
+
+        """
+        if not os.path.isfile('model/my_model.h5'):
+            return False 
+        self.brain = load_model('model/my_model.h5')
+        self.target_model = load_model('model/my_model.h5')
+        with open('model/exploration_rate.p', 'rb') as fp:
+            self.exploration_rate = pickle.load(fp)
+        return True
+
+    def save_model(self):
+        """save everything important related to the model"""
+
+        self.target_model.save('model/model.h5')
+
+        with open('model/exploration_rate.p', 'wb') as fp:
+            pickle.dump(self.exploration_rate, fp, protocol=pickle.HIGHEST_PROTOCOL)
 

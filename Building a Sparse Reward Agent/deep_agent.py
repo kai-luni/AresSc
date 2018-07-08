@@ -113,10 +113,16 @@ class DeepAgent(base_agent.BaseAgent):
             smart_action, x, y = smart_action.split('_')
 
         return (smart_action, x, y)
+
+    def reset(self):
+        """called between 2 episodes"""
+        super(DeepAgent).reset()
+        if(self.episodes%10 == 0):
+            self.qlearn.save_model()
         
     def step(self, obs):
         super(DeepAgent, self).step(obs)
-        
+
         unit_type = obs.observation['screen'][_UNIT_TYPE]
 
         
@@ -163,19 +169,10 @@ class DeepAgent(base_agent.BaseAgent):
         if obs.last():
             current_state = self.getCurrentState(obs, cc_count, supply_depot_count, barracks_count)
 
-            # reward = 0
-            # if(obs.observation['score_cumulative'][0] < 6000):
-            #     reward = -1
-            # if(obs.observation['score_cumulative'][0] > 8000):
-            #     reward = 1
-
             stateObject = [self.previous_state, self.previous_action, obs.reward, current_state, obs.last(), excluded_actions]
-            # if(not (self.previous_state == current_state).all()):
+
             self.qlearn.memory_episode.append(stateObject)
-            # self.qlearn.replayTwo(len(self.qlearn.memory_episode), reward)
-            #self.qlearn.learn(str(self.previous_state), self.previous_action, reward, 'terminal')
-            
-            #self.qlearn.q_table.to_pickle(DATA_FILE + '.gz', 'gzip')
+
             self.qlearn.target_train()
             self.previous_action = None
             self.previous_state = None
@@ -227,7 +224,7 @@ class DeepAgent(base_agent.BaseAgent):
 
             self.steps_last_learn +=1
             if(self.steps_last_learn > 400):
-                self.qlearn.replayTwo(500)
+                self.qlearn.replay(500)
                 self.steps_last_learn = 0
             #self.qlearn.learn(str(self.previous_state), self.previous_action, 0, str(current_state))
     

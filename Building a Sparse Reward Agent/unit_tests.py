@@ -1,11 +1,11 @@
 """Run some basic tests, minimize bugs"""
 
-from map_matrix import MapMatrix
+from map_matrix import get_eight_by_eight_matrix
 from q_agent import QqAgent
 
 def test_map_matrix():
     """test the module map_matrix"""
-    matrix = MapMatrix.get_eight_by_eight_matrix(64, 64)
+    matrix = get_eight_by_eight_matrix(64, 64)
 
 
     if(matrix[0][0].overlaps(matrix[0][1])):
@@ -22,5 +22,3 @@ def test_map_matrix():
 
 test_map_matrix()
 
-print("start")
-test = QqAgent(1, 1)
