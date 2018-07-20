@@ -145,10 +145,10 @@ class QqAgent:
         returns false if model not loaded
 
         """
-        if not os.path.isfile('model/my_model.h5'):
+        if not os.path.isfile('model/model.h5'):
             return False 
-        self.brain = load_model('model/my_model.h5')
-        self.target_model = load_model('model/my_model.h5')
+        self.brain = load_model('model/model.h5')
+        self.target_model = load_model('model/model.h5')
         with open('model/exploration_rate.p', 'rb') as fp:
             self.exploration_rate = pickle.load(fp)
         return True

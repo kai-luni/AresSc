@@ -116,7 +116,7 @@ class DeepAgent(base_agent.BaseAgent):
 
     def reset(self):
         """called between 2 episodes"""
-        super(DeepAgent).reset()
+        #super(DeepAgent).reset()
         if(self.episodes%10 == 0):
             self.qlearn.save_model()
         
