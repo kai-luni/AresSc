@@ -6,7 +6,6 @@ import random
 import pickle
 import numpy as np
 import os.path
-
 from keras.models import Sequential, load_model, Model
 from keras.layers.core import Dense, Dropout, Activation, Flatten
 from keras.layers.wrappers import TimeDistributed

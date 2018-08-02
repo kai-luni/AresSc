@@ -15,7 +15,7 @@ from q_agent import QqAgent
 from map_matrix import get_eight_by_eight_matrix
 from point_rect import Point
 from reward.reward_calculator import RewardCalculator
-from helperFunctions.normalizer import normalize
+from helper_functions.normalizer import normalize
 
 _NO_OP = actions.FUNCTIONS.no_op.id
 _SELECT_POINT = actions.FUNCTIONS.select_point.id
@@ -125,7 +125,7 @@ class DeepAgent(base_agent.BaseAgent):
 
         unit_type = obs.observation['screen'][_UNIT_TYPE]
 
-        
+        var test = obs.observation['rgb_minimap']
 
         if obs.first():
             player_y, player_x = (obs.observation['minimap'][_PLAYER_RELATIVE] == _PLAYER_SELF).nonzero()
