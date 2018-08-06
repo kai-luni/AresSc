@@ -123,12 +123,14 @@ class DeepAgent(base_agent.BaseAgent):
     def step(self, obs):
         super(DeepAgent, self).step(obs)
 
-        unit_type = obs.observation['screen'][_UNIT_TYPE]
+        test = obs.observation['rgb_minimap']
 
-        var test = obs.observation['rgb_minimap']
+        unit_type = obs.observation['rgb_screen'][_UNIT_TYPE]
+
+        
 
         if obs.first():
-            player_y, player_x = (obs.observation['minimap'][_PLAYER_RELATIVE] == _PLAYER_SELF).nonzero()
+            player_y, player_x = (obs.observation['rgb_minimap'][_PLAYER_RELATIVE] == _PLAYER_SELF).nonzero()
             self.base_top_left = 1 if player_y.any() and player_y.mean() <= 31 else 0
         
             self.cc_y, self.cc_x = (unit_type == _TERRAN_COMMANDCENTER).nonzero()
@@ -329,7 +331,7 @@ class DeepAgent(base_agent.BaseAgent):
 
         map_matrix_enemy = get_eight_by_eight_matrix(64, 64)
       
-        enemy_y, enemy_x = (obs.observation['minimap'][_PLAYER_RELATIVE] == _PLAYER_HOSTILE).nonzero()
+        enemy_y, enemy_x = (obs.observation['rgb_minimap'][_PLAYER_RELATIVE] == _PLAYER_HOSTILE).nonzero()
         for i in range(0, len(enemy_y)):
             enemy_position = Point(enemy_x[i] , enemy_y[i])
             for height in range(8):

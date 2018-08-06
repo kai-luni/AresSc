@@ -1,5 +1,5 @@
 from reward.kdh_state_dto import KdhStateDto
-from helperFunctions.normalizer import normalize
+from helper_functions.normalizer import normalize
 
 from pysc2.lib import features
 
@@ -65,7 +65,7 @@ class RewardCalculator:
         state_dto.destroyed_buildings = obs.observation['score_cumulative'][6]
 
 
-        unit_type = obs.observation['screen'][_UNIT_TYPE]
+        unit_type = obs.observation['rgb_screen'][_UNIT_TYPE]
         cc_y, cc_x = (unit_type == _TERRAN_COMMANDCENTER).nonzero()
         cc_count = 1 if cc_y.any() else 0
         depot_y, depot_x = (unit_type == _TERRAN_SUPPLY_DEPOT).nonzero()
