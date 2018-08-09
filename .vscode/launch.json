@@ -30,10 +30,12 @@
             "args": [
                 "--map", "Simple64",
                 "--agent", "deep_agent.DeepAgent",
+                "--agent_race", "terran",
                 "--rgb_minimap_size", "64,64",
                 "--rgb_screen_size", "256,256",
                 "--max_agent_steps", "0",
-                "--action_space", "FEATURES"
+                "--action_space", "FEATURES",
+                "--use_feature_units", "True"
             ],
             "stopOnEntry": false,
             "debugOptions": [

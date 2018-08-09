@@ -9,13 +9,14 @@ import pandas as pd
 
 from pysc2.agents import base_agent
 from pysc2.lib import actions
-from pysc2.lib import features
+from pysc2.lib import actions, features, units
 
 from q_agent import QqAgent
 from map_matrix import get_eight_by_eight_matrix
 from point_rect import Point
 from reward.reward_calculator import RewardCalculator
 from helper_functions.normalizer import normalize
+from helper_functions.obs_helper import get_random_unit, get_count_unit
 
 _NO_OP = actions.FUNCTIONS.no_op.id
 _SELECT_POINT = actions.FUNCTIONS.select_point.id
@@ -130,19 +131,36 @@ class DeepAgent(base_agent.BaseAgent):
         
 
         if obs.first():
-            player_y, player_x = (obs.observation['rgb_minimap'][_PLAYER_RELATIVE] == _PLAYER_SELF).nonzero()
-            self.base_top_left = 1 if player_y.any() and player_y.mean() <= 31 else 0
+            player_y, player_x = (obs.observation.feature_minimap.player_relative == features.PlayerRelative.SELF).nonzero()
+            xmean = player_x.mean()
+            ymean = player_y.mean()
+      
+            if xmean <= 31 and ymean <= 31:
+                self.base_top_left = 1
+            else:
+                self.base_top_left = 0
+            # player_y, player_x = (obs.observation['rgb_minimap'][_PLAYER_RELATIVE] == _PLAYER_SELF).nonzero()
+            # self.base_top_left = 1 if player_y.any() and player_y.mean() <= 31 else 0
         
-            self.cc_y, self.cc_x = (unit_type == _TERRAN_COMMANDCENTER).nonzero()
 
-        cc_y, cc_x = (unit_type == _TERRAN_COMMANDCENTER).nonzero()
-        cc_count = 1 if cc_y.any() else 0
+
+        #self.cc_y, self.cc_x = (unit_type == _TERRAN_COMMANDCENTER).nonzero()
+        #cc_count = 1 if self.cc_y.any() else 0
+
         
-        depot_y, depot_x = (unit_type == _TERRAN_SUPPLY_DEPOT).nonzero()
-        supply_depot_count = int(round(len(depot_y) / 69))
+        commCenter = get_random_unit(obs, units.Terran.CommandCenter)
+        if(commCenter is not None):
+            self.cc_x = commCenter.x
+            self.cc_y = commCenter.y
+        
+        
+        #depot_y, depot_x = (unit_type == _TERRAN_SUPPLY_DEPOT).nonzero()
+        #supply_depot_count = int(round(len(depot_y) / 69))
 
-        barracks_y, barracks_x = (unit_type == _TERRAN_BARRACKS).nonzero()
-        barracks_count = int(round(len(barracks_y) / 137))
+        #barracks_y, barracks_x = (unit_type == _TERRAN_BARRACKS).nonzero()
+        #barracks_count = int(round(len(barracks_y) / 137))
+        supply_depot_count = get_count_unit(obs, units.Terran.SupplyDepot)
+        barracks_count = get_count_unit(obs, units.Terran.Barracks)
 
         supply_used = obs.observation['player'][3]
         supply_limit = obs.observation['player'][4]
@@ -169,7 +187,7 @@ class DeepAgent(base_agent.BaseAgent):
 
 
         if obs.last():
-            current_state = self.getCurrentState(obs, cc_count, supply_depot_count, barracks_count)
+            current_state = self.getCurrentState(obs)
 
             stateObject = [self.previous_state, self.previous_action, obs.reward, current_state, obs.last(), excluded_actions]
 
@@ -190,12 +208,15 @@ class DeepAgent(base_agent.BaseAgent):
             
         if self.move_number == 0:
             self.move_number += 1
-            value = self.moveNumberZero(obs, cc_count, supply_depot_count, barracks_count, barracks_x, barracks_y, unit_type, excluded_actions)
+            value = self.moveNumberZero(obs, unit_type, excluded_actions)
+            testTwo = value[0]
+            if(value[0] != 0):
+                return value
             return value
         
         elif self.move_number == 1:
             self.move_number += 1
-            value =  self.moveNumberOne(obs, supply_depot_count, barracks_count)
+            value =  self.moveNumberOne(obs)
             return value
                 
         elif self.move_number == 2:
@@ -205,8 +226,10 @@ class DeepAgent(base_agent.BaseAgent):
 
         return actions.FunctionCall(_NO_OP, [])
 
-    def moveNumberZero(self, obs, cc_count, supply_depot_count, barracks_count, barracks_x, barracks_y, unit_type, excluded_actions):        
-        current_state = self.getCurrentState(obs, cc_count, supply_depot_count, barracks_count)
+    def moveNumberZero(self, obs, unit_type, excluded_actions):
+        # supply_depot_count = get_count_unit(obs, units.Terran.SupplyDepot)
+        # barracks_count = get_count_unit(obs, units.Terran.SupplyDepot)        
+        current_state = self.getCurrentState(obs)
 
         if self.previous_action is not None and not obs.last():
             killed_unit_score = obs.observation['score_cumulative'][5]
@@ -239,20 +262,29 @@ class DeepAgent(base_agent.BaseAgent):
         smart_action, x, y = self.splitAction(self.previous_action)
         
         if smart_action == ACTION_BUILD_BARRACKS or smart_action == ACTION_BUILD_SUPPLY_DEPOT:
-            unit_y, unit_x = (unit_type == _TERRAN_SCV).nonzero()
+            scv = get_random_unit(obs, units.Terran.SCV)
+
+            if(scv is not None):
+                return actions.FUNCTIONS.select_point("select", (scv.x, scv.y))
+            # unit_y, unit_x = (unit_type == _TERRAN_SCV).nonzero()
                 
-            if unit_y.any():
-                i = random.randint(0, len(unit_y) - 1)
-                target = [unit_x[i], unit_y[i]]
+            # if unit_y.any():
+            #     i = random.randint(0, len(unit_y) - 1)
+            #     target = [unit_x[i], unit_y[i]]
                 
-                return actions.FunctionCall(_SELECT_POINT, [_NOT_QUEUED, target])
+
+            #     return actions.FunctionCall(_SELECT_POINT, [_NOT_QUEUED, target])
             
         elif smart_action == ACTION_BUILD_MARINE:
-            if barracks_y.any():
-                i = random.randint(0, len(barracks_y) - 1)
-                target = [barracks_x[i], barracks_y[i]]
-        
-                return actions.FunctionCall(_SELECT_POINT, [_SELECT_ALL, target])
+            barrack = get_random_unit(obs, units.Terran.Barracks)
+            if(barrack is not None):
+                return actions.FUNCTIONS.select_point("select_all_type", (barrack.x, barrack.y))
+            # if barracks_y.any():
+            #     i = random.randint(0, len(barracks_y) - 1)
+            #     target = [barracks_x[i], barracks_y[i]]
+            #     if(barracks_x[i] < 0 or barracks_y[i] < 0):
+            #         print("oh no")
+            #     return actions.FunctionCall(_SELECT_POINT, [_SELECT_ALL, target])
             
         elif smart_action == ACTION_ATTACK:
             if _SELECT_ARMY in obs.observation['available_actions']:
@@ -260,28 +292,32 @@ class DeepAgent(base_agent.BaseAgent):
 
         return actions.FunctionCall(_NO_OP, [])
 
-    def moveNumberOne(self, obs, supply_depot_count, barracks_count):
+    def moveNumberOne(self, obs):
         smart_action, x, y = self.splitAction(self.previous_action)
+        supply_depot_count = get_count_unit(obs, units.Terran.SupplyDepot)
+        barracks_count = get_count_unit(obs, units.Terran.Barracks)
             
         if smart_action == ACTION_BUILD_SUPPLY_DEPOT:
-            if supply_depot_count < 2 and _BUILD_SUPPLY_DEPOT in obs.observation['available_actions']:
+            if (actions.FUNCTIONS.Build_SupplyDepot_screen.id in obs.observation.available_actions):
                 if self.cc_y.any():
                     if supply_depot_count == 0:
                         target = self.transformDistance(round(self.cc_x.mean()), -35, round(self.cc_y.mean()), 0)
                     elif supply_depot_count == 1:
                         target = self.transformDistance(round(self.cc_x.mean()), -25, round(self.cc_y.mean()), -25)
 
-                    return actions.FunctionCall(_BUILD_SUPPLY_DEPOT, [_NOT_QUEUED, target])
+                    return actions.FUNCTIONS.Build_SupplyDepot_screen("now", target)
+
         
         elif smart_action == ACTION_BUILD_BARRACKS:
-            if barracks_count < 2 and _BUILD_BARRACKS in obs.observation['available_actions']:
+
+            if barracks_count < 2 and actions.FUNCTIONS.Build_Barracks_screen.id in obs.observation.available_actions:
                 if self.cc_y.any():
                     if  barracks_count == 0:
                         target = self.transformDistance(round(self.cc_x.mean()), 15, round(self.cc_y.mean()), -9)
                     elif  barracks_count == 1:
                         target = self.transformDistance(round(self.cc_x.mean()), 15, round(self.cc_y.mean()), 12)
 
-                    return actions.FunctionCall(_BUILD_BARRACKS, [_NOT_QUEUED, target])
+                    return actions.FUNCTIONS.Build_Barracks_screen("now", target)
 
         elif smart_action == ACTION_BUILD_MARINE:
             if _TRAIN_MARINE in obs.observation['available_actions']:
@@ -307,23 +343,28 @@ class DeepAgent(base_agent.BaseAgent):
         smart_action, x, y = self.splitAction(self.previous_action)
             
         if smart_action == ACTION_BUILD_BARRACKS or smart_action == ACTION_BUILD_SUPPLY_DEPOT:
-            if _HARVEST_GATHER in obs.observation['available_actions']:
-                unit_y, unit_x = (unit_type == _NEUTRAL_MINERAL_FIELD).nonzero()
+            if (actions.FUNCTIONS.Harvest_Gather_screen.id in obs.observation.available_actions):
+                mineral_field = get_random_unit(obs, units.Neutral.MineralField)
+                return actions.FunctionCall(_HARVEST_GATHER, [_QUEUED, [mineral_field.x, mineral_field.y]])
+            #if _HARVEST_GATHER in obs.observation['available_actions']:
+                #unit_y, unit_x = (unit_type == _NEUTRAL_MINERAL_FIELD).nonzero()
                 
-                if unit_y.any():
-                    i = random.randint(0, len(unit_y) - 1)
+                # if unit_y.any():
+                #     i = random.randint(0, len(unit_y) - 1)
                     
-                    m_x = unit_x[i]
-                    m_y = unit_y[i]
+                #     m_x = unit_x[i]
+                #     m_y = unit_y[i]
                     
-                    target = [int(m_x), int(m_y)]
+                #     target = [int(m_x), int(m_y)]
                     
-                    return actions.FunctionCall(_HARVEST_GATHER, [_QUEUED, target])
+                #     return actions.FunctionCall(_HARVEST_GATHER, [_QUEUED, target])
         return actions.FunctionCall(_NO_OP, [])
 
-    def getCurrentState(self, obs, cc_count, supply_depot_count, barracks_count):
+    def getCurrentState(self, obs):
+        supply_depot_count = get_count_unit(obs, units.Terran.SupplyDepot)
+        barracks_count = get_count_unit(obs, units.Terran.Barracks)
         current_state = []
-        current_state.append(normalize(cc_count, 0, 1))
+        current_state.append(normalize(get_count_unit(obs, units.Terran.CommandCenter), 0, 1))
         current_state.append(normalize(supply_depot_count, 0, 2))
         current_state.append(normalize(barracks_count, 0, 2))
         army_supply = obs.observation['player'][_ARMY_SUPPLY]
