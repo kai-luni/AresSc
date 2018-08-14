@@ -29,10 +29,12 @@
             "console": "integratedTerminal",
             "args": [
                 "--map", "Simple64",
-                "--agent", "deep_agent.DeepAgent",
+                "--agent", "ares_agent.AresAgent",
                 "--agent_race", "terran",
+                "--feature_minimap_size", "64,64",
+                "--feature_screen_size", "84,84",                
                 "--rgb_minimap_size", "64,64",
-                "--rgb_screen_size", "256,256",
+                "--rgb_screen_size", "84,84",
                 "--max_agent_steps", "0",
                 "--action_space", "FEATURES",
                 "--use_feature_units", "True"
