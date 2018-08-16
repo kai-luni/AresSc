@@ -1,2 +1,7 @@
+
 logs/
 model/
+
+__pycache__/
+settings.json
+
