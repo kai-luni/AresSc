@@ -6,6 +6,7 @@ import random
 import pickle
 import numpy as np
 import os.path
+from time import time
 
 from keras.callbacks import TensorBoard
 from keras.models import Sequential, load_model, Model
@@ -28,8 +29,10 @@ class AresNet:
         self.learning_rate      = 0.01
         self.gamma              = 0.98
         self.exploration_min    = 0.01
-
         self.exploration_decay  = 0.995
+
+        self.tensor_board =  TensorBoard(log_dir="logs/{}".format(time()), histogram_freq=0, write_graph=True, write_images=False)
+
         if(not self.try_load_model()):
             self.exploration_rate   = 1.0
             self.brain              = self._build_model(state_size_one,state_matrix_enemies_size, action_size)
@@ -77,8 +80,7 @@ class AresNet:
             return allowed_actions[rand_action]
         #act_values = self.brain.predict(np.reshape(state, [1, len(state)]))[0]
         
-        act_values = self.brain.predict([np.reshape(state["state_others"], [1, len(state["state_others"])]), np.reshape(state["state_enemy_matrix"], (1, 64, 64, 3))])
-
+        act_values = self.brain.predict([np.reshape(state["state_others"], [1, len(state["state_others"])]), np.reshape(state["state_enemy_matrix"], (1, 64, 64, 3))])[0]
         act_values = self.minimize_excluded(act_values, excluded_actions)
 
         return np.argmax(act_values)
@@ -126,7 +128,9 @@ class AresNet:
 
             targets.append(target_prediction)
         
-        self.brain.train_on_batch([input_others, input_enemy_matrix], np.array(targets))
+        #self.brain.train_on_batch([input_others, input_enemy_matrix], np.array(targets))
+        #test = self.brain.test_on_batch([input_others, input_enemy_matrix], np.array(targets))
+        self.brain.fit([input_others, input_enemy_matrix], np.array(targets), verbose=1, callbacks=[self.tensor_board])
         
 
         if self.exploration_rate > self.exploration_min:
@@ -136,9 +140,9 @@ class AresNet:
     def minimize_excluded(self, predictions, excluded_indexes):
         """minimize the indexes from excluded_indexes => by making them small they are ignored"""
         min_value = np.amin(predictions) - 1
-        if(len(predictions[0]) < 4):
+        if(len(predictions) < 4):
             raise ValueError('wrong form of numpy array prediction.')
-        for i in range(len(predictions[0])):
+        for i in range(len(predictions)):
             if(i in excluded_indexes):
                 predictions[i] = min_value
         return predictions

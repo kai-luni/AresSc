@@ -37,7 +37,9 @@
                 "--rgb_screen_size", "84,84",
                 "--max_agent_steps", "0",
                 "--action_space", "FEATURES",
-                "--use_feature_units", "True"
+                "--use_feature_units", "True",
+                "--render",
+                "--game_steps_per_episode", "40000"
             ],
             "stopOnEntry": false,
             "debugOptions": [

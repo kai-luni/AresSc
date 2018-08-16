@@ -23,7 +23,7 @@ def main(unused_argv):
           agent_interface_format=features.AgentInterfaceFormat(feature_dimensions=features.Dimensions(screen=84, minimap=64), rgb_dimensions=features.Dimensions(screen=196, minimap=64), action_space=actions.ActionSpace.FEATURES, use_feature_units=True),
           step_mul=8,
           game_steps_per_episode=0,
-          visualize=True) as env:
+          visualize=False) as env:
           
         agent.setup(env.observation_spec(), env.action_spec())
         

@@ -251,7 +251,7 @@ class AresAgent(base_agent.BaseAgent):
 
             self.steps_last_learn +=1
             if(self.steps_last_learn > 400):
-                self.qlearn.replay(500)
+                self.qlearn.replay(1000)
                 self.steps_last_learn = 0
             #self.qlearn.learn(str(self.previous_state), self.previous_action, 0, str(current_state))
     
