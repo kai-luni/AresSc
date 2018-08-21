@@ -4,6 +4,8 @@ import random
 import math
 import os.path
 import skimage
+import pickle
+import cv2
 
 import numpy as np
 import pandas as pd
@@ -120,20 +122,20 @@ class AresAgent(base_agent.BaseAgent):
 
     def reset(self):
         """called between 2 episodes"""
-        #super(DeepAgent).reset()
-        if(self.episodes%10 == 0):
-            self.qlearn.save_model()
+        super(AresAgent, self).reset()
+        if(self.episodes%3 == 0):
+            self.qlearn.target_train()
+        self.qlearn.save_model()
         
     def step(self, obs):
         super(AresAgent, self).step(obs)
 
-
-
         unit_type = obs.observation['rgb_screen'][_UNIT_TYPE]
 
-        
-
         if obs.first():
+            if(self.episodes < 2):
+                self.episodes = 1 if not os.path.isfile('model/episodes.p') else pickle.load(open('model/episodes.p', 'rb'))[len(pickle.load(open('model/episodes.p', 'rb')))-1]
+
             player_y, player_x = (obs.observation.feature_minimap.player_relative == features.PlayerRelative.SELF).nonzero()
             xmean = player_x.mean()
             ymean = player_y.mean()
@@ -142,13 +144,6 @@ class AresAgent(base_agent.BaseAgent):
                 self.base_top_left = 1
             else:
                 self.base_top_left = 0
-            # player_y, player_x = (obs.observation['rgb_minimap'][_PLAYER_RELATIVE] == _PLAYER_SELF).nonzero()
-            # self.base_top_left = 1 if player_y.any() and player_y.mean() <= 31 else 0
-        
-
-
-        #self.cc_y, self.cc_x = (unit_type == _TERRAN_COMMANDCENTER).nonzero()
-        #cc_count = 1 if self.cc_y.any() else 0
 
         
         commCenter = get_random_unit(obs, units.Terran.CommandCenter)
@@ -190,13 +185,15 @@ class AresAgent(base_agent.BaseAgent):
 
 
         if obs.last():
+            self.qlearn.replay(15000, obs.observation["score_cumulative"][0], self.episodes)
+
             current_state = self.getCurrentState(obs)
 
             stateObject = [self.previous_state, self.previous_action, obs.reward, current_state, obs.last(), excluded_actions]
 
             self.qlearn.memory_episode.append(stateObject)
 
-            self.qlearn.target_train()
+            
             self.previous_action = None
             self.previous_state = None
             self.previous_obs = None
@@ -249,10 +246,10 @@ class AresAgent(base_agent.BaseAgent):
 
             self.qlearn.memory_episode.append(state_object)
 
-            self.steps_last_learn +=1
-            if(self.steps_last_learn > 400):
-                self.qlearn.replay(1000)
-                self.steps_last_learn = 0
+            # self.steps_last_learn +=1
+            # if(self.steps_last_learn > 400):
+            #     self.qlearn.replay(1000)
+            #     self.steps_last_learn = 0
             #self.qlearn.learn(str(self.previous_state), self.previous_action, 0, str(current_state))
     
         #rl_action = self.qlearn.choose_action(str(current_state))
@@ -375,26 +372,27 @@ class AresAgent(base_agent.BaseAgent):
         army_supply = obs.observation['player'][_ARMY_SUPPLY]
         current_state.append(normalize(army_supply, 0, 19))
 
-        map_matrix_enemy = get_eight_by_eight_matrix(64, 64)
+        #map_matrix_enemy = get_eight_by_eight_matrix(64, 64)
       
-        enemy_y, enemy_x = (obs.observation['rgb_minimap'][_PLAYER_RELATIVE] == _PLAYER_HOSTILE).nonzero()
-        for i in range(0, len(enemy_y)):
-            enemy_position = Point(enemy_x[i] , enemy_y[i])
-            for height in range(8):
-                for width in range(8):
-                    if(map_matrix_enemy[height][width].contains(enemy_position)):
-                        map_matrix_enemy[height][width].value += 1
-                        break
+        # enemy_y, enemy_x = (obs.observation['rgb_minimap'][_PLAYER_RELATIVE] == _PLAYER_HOSTILE).nonzero()
+        # for i in range(0, len(enemy_y)):
+        #     enemy_position = Point(enemy_x[i] , enemy_y[i])
+        #     for height in range(8):
+        #         for width in range(8):
+        #             if(map_matrix_enemy[height][width].contains(enemy_position)):
+        #                 map_matrix_enemy[height][width].value += 1
+        #                 break
 
-        #TODO own object
-        for height in range(8):
-            for width in range(8):
-                #normalize field to -1 to 1
-                map_matrix_enemy[height][width] = normalize(map_matrix_enemy[height][width].value, 0, 30)
+        # #TODO own object
+        # for height in range(8):
+        #     for width in range(8):
+        #         #normalize field to -1 to 1
+        #         map_matrix_enemy[height][width] = normalize(map_matrix_enemy[height][width].value, 0, 30)
 
         #np_array_enemies = np.array(map_matrix_enemy).reshape(8,8,1)
 
         #test_gray = rgb2gray(skimage.img_as_ubyte(obs.observation['rgb_minimap']))
+        #cv2.imwrite('color_img.jpg', obs.observation['rgb_minimap'])
         test_pure = (obs.observation['rgb_minimap'] / 128) - 1
         #test_min = np.min(test_pure)
         #test_max = np.max(test_pure)
