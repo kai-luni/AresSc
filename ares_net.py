@@ -1,11 +1,14 @@
 """deep q learning algorith created with keras"""
 from collections import deque
+from os import listdir
+from os.path import isfile, join
 
 import random
 
 import pickle
 import numpy as np
 import os.path
+import tensorflow as tf
 from time import time
 
 from keras.callbacks import TensorBoard
@@ -24,20 +27,26 @@ class AresNet:
     def __init__(self, state_size_one, state_matrix_enemies_size, action_size):
         self.weight_backup      = "backup_v1.h5"
         self.action_size        = action_size
-        self.memory             = deque(maxlen=16000)
+        self.memory             = deque(maxlen=300000)
         self.memory_episode     = deque()
-        self.learning_rate      = 0.01
-        self.gamma              = 0.98
-        self.exploration_min    = 0.01
-        self.exploration_decay  = 0.995
+        self.learning_rate      = 0.008
+        self.gamma              = 0.992
+        self.exploration_min    = 0.1
+        self.exploration_decay  = 0.992
 
-        self.tensor_board =  TensorBoard(log_dir="logs/{}".format(time()), histogram_freq=0, write_graph=True, write_images=False)
+        self.tensor_board =  TensorBoard(log_dir="logs/{}".format(time()))
+        self.tensor_counter = 0
+        self.counter_trained_pictures = 0
+
+        self.memory = self.load_super_episodes()
 
         if(not self.try_load_model()):
             self.exploration_rate   = 1.0
             self.brain              = self._build_model(state_size_one,state_matrix_enemies_size, action_size)
             # "hack" implemented by DeepMind to improve convergence
             self.target_model       = self._build_model(state_size_one,state_matrix_enemies_size, action_size)
+
+        self.tensor_board.set_model(self.brain)
 
     def _build_model(self, state_size, shape_enemy_map, action_size):
 
@@ -52,8 +61,8 @@ class AresNet:
         out_conv = Flatten()(conv_three)
 
         merged = concatenate([input_one, out_conv])
-        output_one = Dense(800, activation='relu')(merged)
-        output_two = Dense(200, activation='relu')(output_one)
+        output_one = Dense(1400, activation='relu')(merged)
+        output_two = Dense(500, activation='relu')(output_one)
         output_three = Dense(action_size, activation='relu')(output_two)
 
         model = Model([input_one, input_enemies], output_three)
@@ -97,13 +106,16 @@ class AresNet:
 
 
 
-    def replay(self, sample_batch_size):
+    def replay(self, sample_batch_size, game_score, episode):
+
+
         """data replay to train the model"""
         self.memory.extend(self.memory_episode)
-        self.memory_episode = deque()
+        
 
+        print("samples: " + str(len(self.memory)))
         if len(self.memory) < sample_batch_size:
-            return
+            sample_batch_size = len(self.memory)
 
         minibatch = random.sample(self.memory, sample_batch_size)
 
@@ -111,7 +123,26 @@ class AresNet:
         input_enemy_matrix = []
         targets = []  #32, 2
 
+        zero_counter = 0
+        summary_actions = {}
+        max_counter = len(minibatch)/45
         for state_t, action_t, reward_t, state_t1, terminal, disallowed_actions in minibatch:
+            #stop mass learning of one action
+            if(action_t in summary_actions.keys() and summary_actions[action_t] > max_counter):
+                continue
+            if(action_t in summary_actions.keys()):
+                summary_actions[action_t] += 1
+            else:
+                summary_actions[action_t] = 1
+            if(summary_actions[action_t] > max_counter):
+                continue
+
+            #avoid huge amount of do nothing
+            if(action_t == 0):
+                zero_counter += 1
+            if(action_t == 0 and zero_counter > 10):
+                continue
+
             input_others.append(state_t["state_others"])
             input_enemy_matrix.append(np.reshape(state_t1["state_enemy_matrix"], (64, 64, 3)))
             
@@ -127,10 +158,25 @@ class AresNet:
                 target_prediction[action_t] = (reward_t + self.gamma * np.max(expected_future_rewards))
 
             targets.append(target_prediction)
+
+
+        summary_actions_string = ""
+        for key, value in summary_actions.items():
+            summary_actions_string += str(key) + ":" + str(value) + "  "
+        print(summary_actions_string)
+
+        self.counter_trained_pictures += len(input_others)
+        print("trained pictures: " + str(self.counter_trained_pictures))
+        #return_fit = self.brain.fit([input_others, input_enemy_matrix], np.array(targets), verbose=1, epochs=3)
+        training_loss = self.brain.train_on_batch([input_others, input_enemy_matrix], np.array(targets))
+        #logs = self.brain.test_on_batch([input_others, input_enemy_matrix], np.array(targets))
+        #training_loss = return_fit.history["loss"]
+        self.write_plot(episode, training_loss, game_score, self.memory_episode)
+        self.memory_episode = deque()
+        #print("training loss: " + str(training_loss))
+        #self.write_log(self.tensor_board, [test, game_score], episode)
         
-        #self.brain.train_on_batch([input_others, input_enemy_matrix], np.array(targets))
-        #test = self.brain.test_on_batch([input_others, input_enemy_matrix], np.array(targets))
-        self.brain.fit([input_others, input_enemy_matrix], np.array(targets), verbose=1, callbacks=[self.tensor_board])
+        
         
 
         if self.exploration_rate > self.exploration_min:
@@ -161,6 +207,41 @@ class AresNet:
             self.exploration_rate = pickle.load(fp)
         return True
 
+    def write_plot(self, episode, loss, game_score, memory_episode):
+        if not os.path.isfile('model/episodes.p'):
+            pickle.dump([episode], open('model/episodes.p', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+        else:
+            episodes = pickle.load(open('model/episodes.p', 'rb'))
+            episodes.append(episode)
+            pickle.dump(episodes, open('model/episodes.p', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)       
+
+        if not os.path.isfile('model/losses.p'):
+            pickle.dump([loss], open('model/losses.p', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+        else:
+            losses = pickle.load(open('model/losses.p', 'rb'))
+            losses.append(loss)
+            pickle.dump(losses, open('model/losses.p', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)      
+
+        if not os.path.isfile('model/game_scores.p'):
+            pickle.dump([game_score], open('model/game_scores.p', 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+        else:
+            game_scores = pickle.load(open(join('model', 'game_scores.p'), 'rb'))
+            game_scores.append(game_score)
+            pickle.dump(game_scores, open(join('model', 'game_scores.p'), 'wb'), protocol=pickle.HIGHEST_PROTOCOL)                                   
+
+        if(game_score > 8000):
+            foldername_episodes_super = "super_episodes"
+            pickle.dump(memory_episode, open(foldername_episodes_super + '/' + str(game_score) + '_' + str(time()) + '.p', 'wb'), protocol=pickle.HIGHEST_PROTOCOL) 
+
+    def load_super_episodes(self):
+        return_list = []
+        foldername_episodes_super = "super_episodes"
+        onlyfiles = [f for f in listdir(foldername_episodes_super) if isfile(join(foldername_episodes_super, f))]
+        for filename in onlyfiles:
+            memory_episode = pickle.load(open(join(foldername_episodes_super, filename), 'rb'))
+            return_list.extend(memory_episode)
+        return return_list
+
     def save_model(self):
         """save everything important related to the model"""
 
@@ -168,4 +249,7 @@ class AresNet:
 
         with open('model/exploration_rate.p', 'wb') as fp:
             pickle.dump(self.exploration_rate, fp, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+
 

@@ -34,11 +34,11 @@
                 "--feature_minimap_size", "64,64",
                 "--feature_screen_size", "84,84",                
                 "--rgb_minimap_size", "64,64",
-                "--rgb_screen_size", "84,84",
+                "--rgb_screen_size", "256,256",
                 "--max_agent_steps", "0",
                 "--action_space", "FEATURES",
                 "--use_feature_units", "True",
-                "--render",
+                "--norender",
                 "--game_steps_per_episode", "40000"
             ],
             "stopOnEntry": false,
