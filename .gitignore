@@ -2,12 +2,14 @@
 logs/
 model/
 
-__pycache__/
+helper_functions/__pycache__
+__pycache__
 
 
 __pycache__/deep_agent.cpython-35.pyc
 __pycache__/map_matrix.cpython-35.pyc
 __pycache__/point_rect.cpython-35.pyc
 __pycache__/q_agent.cpython-35.pyc
+
 .vscode/
 super_episodes/
