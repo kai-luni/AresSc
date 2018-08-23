@@ -16,7 +16,7 @@ def main(arg):
 
     plt.plot(episodes, losses)
 
-    plt.axis([0, episodes[len(losses)-1], 0, 0.01])
+    plt.axis([0, episodes[len(losses)-1], 0, 0.004])
     plt.show()
 
 if __name__ == "__main__":

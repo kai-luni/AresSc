@@ -37,7 +37,7 @@ class AresDdqnNet:
         self.tensor_counter = 0
         self.counter_trained_pictures = 0
 
-        self.memory = self.load_super_episodes()
+        self.memory = self.load_one_super_episode()
 
         if(not self.try_load_model()):
             self.exploration_rate   = 1.0
@@ -46,6 +46,29 @@ class AresDdqnNet:
             self.target_model       = self.build_model(state_size_one,state_matrix_enemies_size, action_size)
 
         self.tensor_board.set_model(self.brain)
+
+    def act(self, state, excluded_actions):
+        """
+        ask the model what to do
+        excluded_actions: this actions will be excluded from the valid actions
+        """
+
+        if state is None or np.random.rand() <= self.exploration_rate:
+            allowed_actions = []
+            for i in range(self.action_size):
+                allowed_actions.append(i)
+            allowed_actions = np.array(allowed_actions)
+            allowed_actions = np.delete(allowed_actions, excluded_actions)
+            rand_action = random.randrange(len(allowed_actions))
+
+            return allowed_actions[rand_action]
+        #act_values = self.brain.predict(np.reshape(state, [1, len(state)]))[0]
+        
+        act_values = self.brain.predict([np.reshape(state["state_others"], [1, len(state["state_others"])]), np.reshape(state["state_enemy_matrix"], (1, 64, 64, 3))])[0]
+        act_values = self.minimize_excluded_list([act_values], [excluded_actions])
+
+        return np.argmax(act_values)
+
 
 
     def build_model(self, state_size, shape_enemy_map, action_size):
@@ -99,6 +122,22 @@ class AresDdqnNet:
             return_list.append(predictions)
         return return_list
 
+    def save_model(self):
+        """save everything important related to the model"""
+
+        self.target_model.save('model/model.h5')
+
+        with open('model/exploration_rate.p', 'wb') as fp:
+            pickle.dump(self.exploration_rate, fp, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def target_train(self):
+        """copy weights to target network"""
+        weights = self.brain.get_weights()
+        target_weights = self.target_model.get_weights()
+        for i in range(len(target_weights)):
+            target_weights[i] = weights[i]
+        self.target_model.set_weights(target_weights) 
+
     # pick samples randomly from replay memory (with batch_size)
     def replay(self, sample_batch_size, game_score, episode):
         # if len(self.memory) < self.train_start:
@@ -107,8 +146,15 @@ class AresDdqnNet:
             self.exploration_rate *= self.exploration_decay
             print(str(self.exploration_rate))
 
+        """data replay to train the model"""
+        self.memory.extend(self.memory_episode)
+
+        print("samples: " + str(len(self.memory)))
+        if len(self.memory) < sample_batch_size:
+            sample_batch_size = len(self.memory)
         mini_batch = random.sample(self.memory, sample_batch_size)
         mini_batch.extend(self.load_one_super_episode())
+        print("mini_batch: " + str(len(mini_batch)))
 
         # history = np.zeros((len(mini_batch), 64, 64, 3))
         # next_history = np.zeros((len(mini_batch), 64, 64, 3))
@@ -128,14 +174,14 @@ class AresDdqnNet:
         disallowed_actions_list = []
         for state_t, action_t, reward_t, state_t1, terminal, disallowed_actions in mini_batch:
             history.append(state_t)
-            next_history_picture.append(state_t1["state_others"])
-            next_history_other.append(state_t1["state_enemy_matrix"])
+            next_history_picture.append(state_t1["state_enemy_matrix"])
+            next_history_other.append(state_t1["state_others"])
             action.append(action_t)
             reward.append(reward_t)
             dead.append(terminal)
             disallowed_actions_list.append(disallowed_actions)
 
-        target = np.zeros((len(mini_batch), ))
+        target = np.zeros((len(mini_batch), 68))
         history = np.array(history)
         # next_history_picture = np.array(next_history_picture)
         # next_history_other = np.array(next_history_other)
@@ -143,10 +189,10 @@ class AresDdqnNet:
         reward = np.array(reward)
         dead = np.array(dead)
 
-        value = self.brain.predict(next_history_other, next_history_picture)
-        value = self.minimize_excluded_list(value, disallowed_actions)
-        target_value = self.target_model.predict(next_history_other, next_history_picture)
-        target_value = self.minimize_excluded_list(target_value, disallowed_actions)
+        value = self.brain.predict([next_history_other, next_history_picture])
+        value = self.minimize_excluded_list(value, disallowed_actions_list)
+        target_value = self.target_model.predict([next_history_other, next_history_picture])
+        target_value = self.minimize_excluded_list(target_value, disallowed_actions_list)
         # like Q Learning, get maximum Q value at s'
         # But from target model
         for i in range(len(mini_batch)):
@@ -156,13 +202,18 @@ class AresDdqnNet:
                 # the key point of Double DQN
                 # selection of action is from model
                 # update is from target model
-                target[i] = reward[i] + self.gamma * target_value[i][np.argmax(value[i])]
+                #print(target[i])
+                target[i][action[i]] = reward[i] + self.gamma * target_value[i][np.argmax(value[i])]
+                #print(target[i])
+                #print(action[i])
 
 
         return_fit = self.brain.fit([next_history_other, next_history_picture], np.array(target), verbose=1, epochs=3)
         training_loss = return_fit.history["loss"]
 
         self.write_plot(episode, training_loss, game_score, self.memory_episode)
+        self.memory_episode = deque()
+
 
 
     def try_load_model(self):

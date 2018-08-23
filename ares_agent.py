@@ -14,9 +14,7 @@ from pysc2.agents import base_agent
 from pysc2.lib import actions
 from pysc2.lib import actions, features, units
 
-from q_agent import QqAgent
-from ares_net import AresNet
-from neural_networks import DDQNAgent
+from neural_networks.ares_ddqn_net import AresDdqnNet
 from map_matrix import get_eight_by_eight_matrix
 from point_rect import Point
 from reward.reward_calculator import RewardCalculator
@@ -81,7 +79,7 @@ class AresAgent(base_agent.BaseAgent):
 
         action_size = len(smart_actions)
         state_size = 4
-        self.qlearn = QqAgent(state_size_one=state_size, state_matrix_enemies_size=(8, 8, 1), action_size=action_size)
+        self.qlearn = AresDdqnNet(state_size_one=state_size, state_matrix_enemies_size=(8, 8, 1), action_size=action_size)
         self.steps_last_learn = 0
 
 

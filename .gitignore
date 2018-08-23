@@ -3,7 +3,7 @@ logs/
 model/
 
 helper_functions/__pycache__
-__pycache__
+__pycache__/
 
 
 __pycache__/deep_agent.cpython-35.pyc
@@ -13,3 +13,4 @@ __pycache__/q_agent.cpython-35.pyc
 
 .vscode/
 super_episodes/
+/__pycache__/ares_agent.cpython-35.pyc
