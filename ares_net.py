@@ -144,7 +144,7 @@ class AresNet:
                 continue
 
             input_others.append(state_t["state_others"])
-            input_enemy_matrix.append(np.reshape(state_t1["state_enemy_matrix"], (64, 64, 3)))
+            input_enemy_matrix.append(np.reshape(state_t["state_enemy_matrix"], (64, 64, 3)))
             
             expected_future_rewards = self.target_model.predict([np.reshape(state_t1["state_others"], [1, len(state_t1["state_others"])]), np.reshape(state_t1["state_enemy_matrix"], (1, 64, 64, 3))])[0]
             expected_future_rewards = self.minimize_excluded(expected_future_rewards, disallowed_actions)
