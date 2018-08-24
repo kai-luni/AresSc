@@ -154,6 +154,8 @@ class AresDdqnNet:
             sample_batch_size = len(self.memory)
         mini_batch = random.sample(self.memory, sample_batch_size)
         mini_batch.extend(self.load_one_super_episode())
+        mini_batch.extend(self.load_one_super_episode())
+        mini_batch.extend(self.load_one_super_episode())
         print("mini_batch: " + str(len(mini_batch)))
 
         # history = np.zeros((len(mini_batch), 64, 64, 3))
@@ -208,7 +210,7 @@ class AresDdqnNet:
                 #print(action[i])
 
 
-        return_fit = self.brain.fit([next_history_other, next_history_picture], np.array(target), verbose=1, epochs=3)
+        return_fit = self.brain.fit([next_history_other, next_history_picture], np.array(target), verbose=1, epochs=2)
         training_loss = return_fit.history["loss"]
 
         self.write_plot(episode, training_loss, game_score, self.memory_episode)
