@@ -15,3 +15,5 @@ __pycache__/q_agent.cpython-35.pyc
 super_episodes/
 /__pycache__/ares_agent.cpython-35.pyc
 /model/exploration_rate.p
+/model/exploration_rate.p
+/reward/__pycache__/reward_calculator.cpython-35.pyc
