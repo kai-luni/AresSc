@@ -150,12 +150,6 @@ class AresAgent(base_agent.BaseAgent):
             self.cc_x = commCenter.x
             self.cc_y = commCenter.y
         
-        
-        #depot_y, depot_x = (unit_type == _TERRAN_SUPPLY_DEPOT).nonzero()
-        #supply_depot_count = int(round(len(depot_y) / 69))
-
-        #barracks_y, barracks_x = (unit_type == _TERRAN_BARRACKS).nonzero()
-        #barracks_count = int(round(len(barracks_y) / 137))
         supply_depot_count = get_count_unit(obs, units.Terran.SupplyDepot)
         barracks_count = get_count_unit(obs, units.Terran.Barracks)
 

@@ -1,0 +1,9 @@
+Alpha 2
+
+Problem: Its hard to put all the action space in one level. Right now its like this: 0-3 are simple tasks like to build a 
+supply depot, then there is 4 to 67 for attacking different areas of the map. That does not seem very natural and in fact 
+it does not to work very well. 4 to 67 have all the same meaning, which is to attack, but it takes more than 90% of the action 
+space. Attack should be just one option and then another neural net makes the decision where to attack.
+
+Target: For this version I will first script a simple program that gives all the orders like building and attacking. Then there 
+will be a neural net taking care of where to attack.
