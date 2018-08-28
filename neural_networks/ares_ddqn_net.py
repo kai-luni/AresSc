@@ -26,12 +26,12 @@ class AresDdqnNet:
     def __init__(self, state_size_one, state_matrix_enemies_size, action_size):
         self.weight_backup      = "backup_v1.h5"
         self.action_size        = action_size
-        self.memory             = deque(maxlen=300000)
+        self.memory             = deque(maxlen=400000)
         self.memory_episode     = deque()
         self.learning_rate      = 0.008
         self.gamma              = 0.992
         self.exploration_min    = 0.1
-        self.exploration_decay  = 0.992
+        self.exploration_decay  = 0.995
 
         self.tensor_board =  TensorBoard(log_dir="logs/{}".format(time()))
         self.tensor_counter = 0
@@ -153,9 +153,10 @@ class AresDdqnNet:
         if len(self.memory) < sample_batch_size:
             sample_batch_size = len(self.memory)
         mini_batch = random.sample(self.memory, sample_batch_size)
-        mini_batch.extend(self.load_one_super_episode())
-        mini_batch.extend(self.load_one_super_episode())
-        mini_batch.extend(self.load_one_super_episode())
+        temp_deque = deque()
+        for i in range(16):
+            temp_deque.extend(self.load_one_super_episode())
+        mini_batch.extend(random.sample(temp_deque, int(len(temp_deque)/4)))
         print("mini_batch: " + str(len(mini_batch)))
 
         # history = np.zeros((len(mini_batch), 64, 64, 3))

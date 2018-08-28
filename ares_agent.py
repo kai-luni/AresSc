@@ -184,7 +184,7 @@ class AresAgent(base_agent.BaseAgent):
 
 
         if obs.last():
-            self.qlearn.replay(15000, obs.observation["score_cumulative"][0], self.episodes)
+            self.qlearn.replay(30000, obs.observation["score_cumulative"][0], self.episodes)
 
             current_state = self.getCurrentState(obs)
 
