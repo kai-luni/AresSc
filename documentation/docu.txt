@@ -5,5 +5,5 @@ supply depot, then there is 4 to 67 for attacking different areas of the map. Th
 it does not to work very well. 4 to 67 have all the same meaning, which is to attack, but it takes more than 90% of the action 
 space. Attack should be just one option and then another neural net makes the decision where to attack.
 
-Target: For this version I will first script a simple program that gives all the orders like building and attacking. Then there 
-will be a neural net taking care of where to attack.
+Target: For this version I will first script a simple program that gives all the orders for building. Then there 
+will be a second logic, a neural net, taking care of where to attack. Every logic will have half of the steps.

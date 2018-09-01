@@ -6,7 +6,6 @@ import os.path
 import skimage
 import pickle
 import cv2
-
 import numpy as np
 import pandas as pd
 
@@ -178,7 +177,7 @@ class AresAgent(base_agent.BaseAgent):
 
 
         if obs.last():
-            self.qlearn.replay(30000, obs.observation["score_cumulative"][0], self.episodes)
+            self.qlearn.replay(15000, obs.observation["score_cumulative"][0], self.episodes)
 
             current_state = self.getCurrentState(obs)
 
@@ -356,6 +355,14 @@ class AresAgent(base_agent.BaseAgent):
         return actions.FunctionCall(_NO_OP, [])
 
     def getCurrentState(self, obs):
+        """
+        get an array with information about
+        0: command center count
+        1: supply depot count
+        2: barracks count
+        3: supply depot count
+        normalized to be between -1 and 1
+        """
         supply_depot_count = get_count_unit(obs, units.Terran.SupplyDepot)
         barracks_count = get_count_unit(obs, units.Terran.Barracks)
         current_state = []
@@ -364,32 +371,7 @@ class AresAgent(base_agent.BaseAgent):
         current_state.append(normalize(barracks_count, 0, 2))
         army_supply = obs.observation['player'][_ARMY_SUPPLY]
         current_state.append(normalize(army_supply, 0, 19))
-
-        #map_matrix_enemy = get_eight_by_eight_matrix(64, 64)
-      
-        # enemy_y, enemy_x = (obs.observation['rgb_minimap'][_PLAYER_RELATIVE] == _PLAYER_HOSTILE).nonzero()
-        # for i in range(0, len(enemy_y)):
-        #     enemy_position = Point(enemy_x[i] , enemy_y[i])
-        #     for height in range(8):
-        #         for width in range(8):
-        #             if(map_matrix_enemy[height][width].contains(enemy_position)):
-        #                 map_matrix_enemy[height][width].value += 1
-        #                 break
-
-        # #TODO own object
-        # for height in range(8):
-        #     for width in range(8):
-        #         #normalize field to -1 to 1
-        #         map_matrix_enemy[height][width] = normalize(map_matrix_enemy[height][width].value, 0, 30)
-
-        #np_array_enemies = np.array(map_matrix_enemy).reshape(8,8,1)
-
-        #test_gray = rgb2gray(skimage.img_as_ubyte(obs.observation['rgb_minimap']))
-        #cv2.imwrite('color_img.jpg', obs.observation['rgb_minimap'])
         test_pure = (obs.observation['rgb_minimap'] / 128) - 1
-        #test_min = np.min(test_pure)
-        #test_max = np.max(test_pure)
-        #test_final = (test_gray * 2) - 1
 
         return_dict = {}
         return_dict["state_enemy_matrix"] = test_pure
