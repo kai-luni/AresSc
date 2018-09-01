@@ -2,7 +2,7 @@ import random
 
 import numpy as np
 
-from normalizer import normalize
+from helper_functions.normalizer import normalize
 from pysc2.lib import actions, features, units
 
 def get_current_state(obs):
@@ -26,7 +26,7 @@ def get_current_state(obs):
     current_state.append(normalize(army_supply, 0, 19))
     rgb_minimap = (obs.observation['rgb_minimap'] / 128) - 1
 
-    raise Exception("4: resources")
+    #raise Exception("4: resources")
 
     return_dict = {}
     return_dict["state_enemy_matrix"] = rgb_minimap

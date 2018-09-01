@@ -1,4 +1,4 @@
-from ares_agent_new import ActionBaseDto
+from dto.action_base_dto import ActionBaseDto
 from helper_functions.obs_helper import get_current_state, get_random_unit, get_count_unit
 from helper_functions.geo_helper import transform_distance
 
@@ -23,12 +23,12 @@ class JaervsjoeBuildBase:
         #keep track of what action we are performin right now
         self.previous_action = None       
 
-    def act_build_base(self, current_state):
+    def act_build_base(self, current_state_others):
         #TODO: build command center
-        command_center_count = current_state[0]
-        supply_depot_count = current_state[1]
-        barracks_count = current_state[2]
-        army_supply_count = current_state[3]
+        command_center_count = current_state_others[0]
+        supply_depot_count = current_state_others[1]
+        barracks_count = current_state_others[2]
+        army_supply_count = current_state_others[3]
         # resources = current_state[4]
 
         # cost_command_center = 100
@@ -49,7 +49,7 @@ class JaervsjoeBuildBase:
         if obs.last():
             raise Exception('last frame, not defined')
 
-        smart_action = self.act_build_base(current_state)
+        smart_action = self.act_build_base(current_state["state_others"])
         self.previous_action = smart_action
         #activity = LastActivityAresDto(rl_action, 0, obs, current_state)
 

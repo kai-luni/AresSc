@@ -22,14 +22,14 @@
             ]
           },
           {
-            "name": "pysc2TrainNew",
+            "name": "pysc2TrainAlphaTwo",
             "type": "python",
             "request": "launch",
             "module": "pysc2.bin.agent",
             "console": "integratedTerminal",
             "args": [
                 "--map", "Simple64",
-                "--agent", "ares_agent.AresAgent",
+                "--agent", "ares_agent_new.AresAgentNew",
                 "--agent_race", "terran",
                 "--feature_minimap_size", "64,64",
                 "--feature_screen_size", "84,84",                
