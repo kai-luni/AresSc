@@ -53,7 +53,7 @@ class AresDdqnNet:
         excluded_actions: this actions will be excluded from the valid actions
         """
 
-        if state is None or np.random.rand() <= self.exploration_rate:
+        if state is None or np.random.rand() <= self.exploration_rate  or len(self.memory) < 20000:
             allowed_actions = []
             for i in range(self.action_size):
                 allowed_actions.append(i)
@@ -142,7 +142,7 @@ class AresDdqnNet:
     def replay(self, sample_batch_size, game_score, episode):
         # if len(self.memory) < self.train_start:
         #     return
-        if self.exploration_rate > self.exploration_min:
+        if self.exploration_rate > self.exploration_min and len(self.memory) > 20000:
             self.exploration_rate *= self.exploration_decay
             print(str(self.exploration_rate))
 
@@ -171,12 +171,13 @@ class AresDdqnNet:
         #     reward.append(mini_batch[i][2])
         #     dead.append(mini_batch[i][4])
 
-        history = []
+        history_picture, history_other = [], []
         next_history_picture, next_history_other = [], []
         action, reward, dead = [], [], []
         disallowed_actions_list = []
         for state_t, action_t, reward_t, state_t1, terminal, disallowed_actions in mini_batch:
-            history.append(state_t)
+            history_picture.append(state_t["state_enemy_matrix"])
+            history_other.append(state_t["state_others"])
             next_history_picture.append(state_t1["state_enemy_matrix"])
             next_history_other.append(state_t1["state_others"])
             action.append(action_t)
@@ -184,8 +185,7 @@ class AresDdqnNet:
             dead.append(terminal)
             disallowed_actions_list.append(disallowed_actions)
 
-        target = np.zeros((len(mini_batch), 68))
-        history = np.array(history)
+        #history = np.array(history)
         # next_history_picture = np.array(next_history_picture)
         # next_history_other = np.array(next_history_other)
         action = np.array(action)
@@ -200,21 +200,31 @@ class AresDdqnNet:
         # But from target model
         for i in range(len(mini_batch)):
             if dead[i]:
-                target[i] = reward[i]
+                target_value[i][action[i]] = reward[i]
             else:
                 # the key point of Double DQN
                 # selection of action is from model
                 # update is from target model
-                #print(target[i])
-                target[i][action[i]] = reward[i] + self.gamma * target_value[i][np.argmax(value[i])]
-                #print(target[i])
-                #print(action[i])
+                target_value[i][action[i]] = reward[i] + self.gamma * target_value[i][np.argmax(value[i])]
+        finished = False
+        input_others_temp, input_enemy_matrix_temp, targets_temp = [], [], []
+        for i in range(len(target_value)):
+            input_others_temp.append(history_other[i])
+            input_enemy_matrix_temp.append(history_picture[i])
+            targets_temp.append(target_value[i])
+            if i == (len(target_value) - 1):
+                training_loss = self.brain.train_on_batch([input_others_temp, input_enemy_matrix_temp], np.array(targets_temp))
+                self.write_plot(episode, [training_loss], game_score, self.memory_episode)
+                continue
+            if len(targets_temp) % 8000 == 0:
+                training_loss = self.brain.train_on_batch([input_others_temp, input_enemy_matrix_temp], np.array(targets_temp))
+                input_others_temp, input_enemy_matrix_temp, targets_temp = [], [], []
 
+        #return_fit = self.brain.fit([history_other, history_picture], np.array(target_value), verbose=1, epochs=2)
+        #training_loss = self.brain.train_on_batch([input_others, input_enemy_matrix], np.array(targets))
+        #training_loss = return_fit.history["loss"]
 
-        return_fit = self.brain.fit([next_history_other, next_history_picture], np.array(target), verbose=1, epochs=2)
-        training_loss = return_fit.history["loss"]
-
-        self.write_plot(episode, training_loss, game_score, self.memory_episode)
+        
         self.memory_episode = deque()
 
 
