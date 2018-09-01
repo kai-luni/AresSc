@@ -21,9 +21,9 @@ def main(arg):
     print(type(losses))
     loss_list = []
     for i in range(len(losses)):
-        loss_list.append(losses[i][1])
+        loss_list.append(losses[i][0])
 
-    plt.plot(episodes, game_scores)
+    plt.plot(episodes, loss_list)
 
     #plt.axis([0, episodes[len(losses)-1], 0, 0.004])
     plt.show()
