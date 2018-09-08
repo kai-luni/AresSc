@@ -5,13 +5,14 @@ from helper_functions.obs_helper  import get_count_unit
 
 from pysc2.lib import actions, features, units
 
-KILL_UNIT_REWARD = 0.4
-KILL_BUILDING_REWARD = 0.9
+KILL_UNIT_REWARD = 0.1
+KILL_BUILDING_REWARD = 0.2
+
 BUILD_FIGHTING_UNIT_REWARD = 0.4
 BUILD_IMPORTANT_BUILDING_REWARD = 0.6
 
-LOOSE_BUILDING_PENALTY = -0.9
-LOOSE_FIGHTING_UNIT_PENALTY = -0.4
+LOOSE_BUILDING_PENALTY = -0.2
+LOOSE_FIGHTING_UNIT_PENALTY = -0.1
 
 _TERRAN_COMMANDCENTER = 18
 _TERRAN_SUPPLY_DEPOT = 19
@@ -38,17 +39,20 @@ class RewardCalculator:
         if(kdh_state.destroyed_buildings > self.last_kdh_state.destroyed_buildings):
             reward += KILL_BUILDING_REWARD
 
-        if(kdh_state.own_army < 0.4 and kdh_state.action == 3):
-            reward += BUILD_FIGHTING_UNIT_REWARD
+        # if(kdh_state.own_army < 0.4 and kdh_state.action == 3):
+        #     reward += BUILD_FIGHTING_UNIT_REWARD
 
         if(kdh_state.own_buildings < self.last_kdh_state.own_buildings):
             reward += LOOSE_BUILDING_PENALTY
 
-        if(kdh_state.own_barracks < 2 and kdh_state.action == 2):
-            reward += BUILD_IMPORTANT_BUILDING_REWARD
+        if(kdh_state.own_army < self.last_kdh_state.own_army):
+            reward += LOOSE_FIGHTING_UNIT_PENALTY            
 
-        if(kdh_state.own_depot < 2 and kdh_state.action == 1):
-            reward += BUILD_IMPORTANT_BUILDING_REWARD
+        # if(kdh_state.own_barracks < 2 and kdh_state.action == 2):
+        #     reward += BUILD_IMPORTANT_BUILDING_REWARD
+
+        # if(kdh_state.own_depot < 2 and kdh_state.action == 1):
+        #     reward += BUILD_IMPORTANT_BUILDING_REWARD
 
         if(reward < -1):
             reward = -1
@@ -59,10 +63,9 @@ class RewardCalculator:
 
         return reward
 
-    def get_reward_from_observation(self, obs, action):
+    def get_reward_from_observation(self, obs,):
         state_dto = KdhStateDto()
 
-        state_dto.action = action
         state_dto.killed_enemies = obs.observation['score_cumulative'][5]
         state_dto.destroyed_buildings = obs.observation['score_cumulative'][6]
 

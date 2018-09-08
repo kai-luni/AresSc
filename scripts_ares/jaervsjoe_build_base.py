@@ -21,8 +21,33 @@ _HARVEST_GATHER = actions.FUNCTIONS.Harvest_Gather_screen.id
 class JaervsjoeBuildBase:
     def __init__(self):
         #keep track of what action we are performin right now
-        self.previous_action = None       
+        self.previous_action = None   
+        self.move_number = 0    
 
+    def step(self, obs):
+        if obs.first():
+            player_y, player_x = (obs.observation.feature_minimap.player_relative == features.PlayerRelative.SELF).nonzero()
+            xmean = player_x.mean()
+            ymean = player_y.mean()
+      
+            if xmean <= 31 and ymean <= 31:
+                self.base_top_left = 1
+            else:
+                self.base_top_left = 0
+
+            if self.move_number == 0:
+                self.move_number += 1
+                value = self.moveNumberZero(obs)
+            elif self.move_number == 1:
+                self.move_number += 1
+                value =  self.moveNumberOne(obs, self.base_top_left)
+            elif self.move_number == 2:
+                self.move_number = 0
+                self.attack = not self.attack
+                value =  self.moveNumberTwo(obs)
+            else:
+                value = actions.FunctionCall(_NO_OP, [])
+        return value
     def act_build_base(self, current_state_others):
         #TODO: build command center
         command_center_count = current_state_others[0]
@@ -34,11 +59,11 @@ class JaervsjoeBuildBase:
         # cost_command_center = 100
         # cost_supply_depot = 100
         # cost_barracks = 100
-
-        if barracks_count < 0.9:
-            return ActionBaseDto.build_barracks()
+        
         if supply_depot_count < 0.9:
             return ActionBaseDto.build_supply_depot()
+        if barracks_count < 0.9:
+            return ActionBaseDto.build_barracks()
         if army_supply_count < 1:
             return ActionBaseDto.build_marine()
 
