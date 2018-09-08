@@ -23,7 +23,7 @@ from ares_env import AresEnv
 INPUT_SHAPE = (64, 64, 3)
 WINDOW_LENGTH = 4
 
-ares_env = AresEnv
+ares_env = AresEnv()
 
 
 class AresProcessor(Processor):
@@ -96,5 +96,20 @@ dqn = DQNAgent(model=model, nb_actions=65, policy=policy, memory=memory,
                processor=processor, nb_steps_warmup=50000, gamma=.99, target_model_update=10000,
                train_interval=4, delta_clip=1.)
 dqn.compile(Adam(lr=.00025), metrics=['mae'])
+
+# Okay, now it's time to learn something! We capture the interrupt exception so that training
+# can be prematurely aborted. Notice that you can the built-in Keras callbacks!
+weights_filename = 'dqn__weights.h5f'
+checkpoint_weights_filename = 'dqn__weights_{step}.h5f'
+log_filename = 'dqn__log.json'
+callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=250000)]
+callbacks += [FileLogger(log_filename, interval=100)]
+dqn.fit(ares_env, callbacks=callbacks, nb_steps=1750000, log_interval=10000)
+
+# After training is done, we save the final weights one more time.
+dqn.save_weights(weights_filename, overwrite=True)
+
+# Finally, evaluate our algorithm for 10 episodes.
+dqn.test(ares_env, nb_episodes=10, visualize=False)
 
     
