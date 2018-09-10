@@ -20,18 +20,18 @@ from keras import backend as K
 from ares_env import AresEnv
 
 
-INPUT_SHAPE = (64, 64, 3)
+INPUT_SHAPE = (64, 64)
 WINDOW_LENGTH = 4
 
 ares_env = AresEnv()
 
 
 class AresProcessor(Processor):
-    def process_observation(self, observation):
-        rgb_minimap = observation['rgb_minimap']
+    def process_observation(self, obs):
+        rgb_minimap = obs.observation['rgb_minimap']
         assert rgb_minimap.ndim == 3  # (height, width, channel)
-        img = Image.fromarray(rgb_minimap)
-        #img = img.resize(INPUT_SHAPE).convert('L')  # resize and convert to grayscale
+        img = Image.fromarray(rgb_minimap.astype('uint8'))
+        img = img.convert('L')  # convert to grayscale
         processed_observation = np.array(img)
         assert processed_observation.shape == INPUT_SHAPE
         return processed_observation.astype('uint8')  # saves storage in experience memory
@@ -55,6 +55,7 @@ model = Sequential()
 if K.image_dim_ordering() == 'tf':
     # (width, height, channels)
     model.add(Permute((2, 3, 1), input_shape=input_shape))
+    #model.add(Permute((2, 3, 1), input_shape=input_shape))
 elif K.image_dim_ordering() == 'th':
     # (channels, width, height)
     model.add(Permute((1, 2, 3), input_shape=input_shape))
@@ -84,7 +85,7 @@ processor = AresProcessor()
 # (low eps). We also set a dedicated eps value that is used during testing. Note that we set it to 0.05
 # so that the agent still performs some random actions. This ensures that the agent cannot get stuck.
 policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.1, value_test=.05,
-                              nb_steps=1000000)
+                              nb_steps=100000)
 
 # The trade-off between exploration and exploitation is difficult and an on-going research topic.
 # If you want, you can experiment with the parameters or use a different policy. Another popular one
@@ -93,18 +94,19 @@ policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., valu
 # Feel free to give it a try!
 
 dqn = DQNAgent(model=model, nb_actions=65, policy=policy, memory=memory,
-               processor=processor, nb_steps_warmup=50000, gamma=.99, target_model_update=10000,
-               train_interval=4, delta_clip=1.)
+               processor=processor, nb_steps_warmup=500, gamma=.99, target_model_update=2000,
+               train_interval=4, delta_clip=1., enable_dueling_network=True)
 dqn.compile(Adam(lr=.00025), metrics=['mae'])
+dqn.load_weights('dqn__weights_72500.h5f')
 
 # Okay, now it's time to learn something! We capture the interrupt exception so that training
 # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
 weights_filename = 'dqn__weights.h5f'
 checkpoint_weights_filename = 'dqn__weights_{step}.h5f'
 log_filename = 'dqn__log.json'
-callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=250000)]
+callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=2500)]
 callbacks += [FileLogger(log_filename, interval=100)]
-dqn.fit(ares_env, callbacks=callbacks, nb_steps=1750000, log_interval=10000)
+dqn.fit(ares_env, callbacks=callbacks, nb_steps=175000, log_interval=10000, verbose=2)
 
 # After training is done, we save the final weights one more time.
 dqn.save_weights(weights_filename, overwrite=True)

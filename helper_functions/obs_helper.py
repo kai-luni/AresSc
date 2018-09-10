@@ -83,3 +83,16 @@ def get_count_unit(obs, unit_id):
     """
     units = [unit for unit in obs.observation.feature_units if unit.unit_type == unit_id]
     return len(units)
+
+def base_is_upper_left(obs):
+    """
+    get position of base
+    return: (bool) true: upper left, fasle: lower right
+    """
+    player_y, player_x = (obs.observation.feature_minimap.player_relative == features.PlayerRelative.SELF).nonzero()
+    xmean = player_x.mean()
+    ymean = player_y.mean()
+    if xmean <= 31 and ymean <= 31:
+        return True
+    return False
+

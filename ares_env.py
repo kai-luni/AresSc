@@ -67,19 +67,10 @@ class AresEnv(Env):
         for i in range(6):
             
             if obs.last():
-                self.last_obs = self.pysc2_env.reset()
-                return self.last_obs, obs.reward, True, None
+                self.last_obs = self.pysc2_env.reset()[0]
+                return self.last_obs, obs.reward, True, {}
 
             if obs.first():
-                #TODO: change to pysc2 v2
-                player_y, player_x = (obs.observation.feature_minimap.player_relative == features.PlayerRelative.SELF).nonzero()
-                xmean = player_x.mean()
-                ymean = player_y.mean()        
-                if xmean <= 31 and ymean <= 31:
-                    self.base_top_left = 1
-                else:
-                    self.base_top_left = 0
-
                 #important: reset reward calculator
                 self.reward_calculator = RewardCalculator()
 
@@ -88,19 +79,67 @@ class AresEnv(Env):
             if i == 0:
                 value = self.build_Bot.moveNumberZero(obs)
             elif i == 1:
-                value =  self.build_Bot.moveNumberOne(obs, self.base_top_left)
+                value =  self.build_Bot.moveNumberOne(obs)
             elif i == 2:
                 value =  self.build_Bot.moveNumberTwo(obs)
-            if i == 3:
+            elif action == 64:
+                #action 64 is no action
+                value =  actions.FunctionCall(_NO_OP, [])
+            elif i == 3:
                 value = self.moveNumberZero(obs)
             elif i == 4:
                 value =  self.moveNumberOne(obs, action)
             elif i == 5:
                 value =  actions.FunctionCall(_NO_OP, [])
-            obs = self.pysc2_env.step(value)
+            obs = self.pysc2_env.step([value])[0]
 
         self.last_obs = obs
-        return obs, reward, False, None
+        return obs, reward, False, {}
+
+    def reset(self):
+        """
+        Resets the state of the environment and returns an initial observation.
+
+        # Returns
+            observation (object): The initial observation of the space. Initial reward is assumed to be 0.
+        """
+        return self.pysc2_env.reset()[0]
+
+
+    def render(self, mode='human', close=False):
+        """Renders the environment.
+        The set of supported modes varies per environment. (And some
+        environments do not support rendering at all.)
+
+        # Arguments
+            mode (str): The mode to render with.
+            close (bool): Close all open renderings.
+        """
+        print('do nothing')
+
+    def close(self):
+        """Override in your subclass to perform any necessary cleanup.
+        Environments will automatically close() themselves when
+        garbage collected or when the program exits.
+        """
+        self.pysc2_env.close()
+
+    def seed(self, seed=None):
+        """Sets the seed for this env's random number generator(s).
+
+        # Returns
+            Returns the list of seeds used in this env's random number generators
+        """
+        raise NotImplementedError()
+
+    def configure(self, *args, **kwargs):
+        """Provides runtime configuration to the environment.
+        This configuration should consist of data that tells your
+        environment how to run (such as an address of a remote server,
+        or path to your ImageNet data). It should not affect the
+        semantics of the environment.
+        """
+        raise NotImplementedError()
 
     def moveNumberZero(self, obs):
         """select all fighting units"""
