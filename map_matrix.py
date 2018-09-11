@@ -37,7 +37,7 @@ def get_coordinates_by_index(matrix, index):
     for height in range(8):
         for width in range(8):
             if(i == index):
-                return matrix[height][width].get_center()
+                return matrix[height][width].get_random_point()
             i += 1
     raise Exception('out of bounds: ' + str(index))
 

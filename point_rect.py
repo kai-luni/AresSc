@@ -9,6 +9,7 @@ Rect  -- two points, forming a rectangle
 """
 
 import math
+import random
 
 class Point:
     
@@ -179,6 +180,16 @@ class Rect:
     def get_center(self):
         """return the center of rect as point"""
         return Point(self.left + ((self.right-self.left)/2), self.top + ((self.bottom-self.top)/2))
+
+    def get_random_point(self):
+        """get a random point in the rect"""
+        width = int(self.right - self.left)
+        height = int(self.bottom - self.top)
+        rand_x = self.right + random.randint(0,width-1)
+        rand_y = self.top + random.randint(0,height-1)
+        return_point = Point(rand_x, rand_y)
+        assert self.contains(return_point)
+        return return_point
     
     def expanded_by(self, n):
         """Return a rectangle with extended borders.
