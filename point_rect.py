@@ -185,8 +185,8 @@ class Rect:
         """get a random point in the rect"""
         width = int(self.right - self.left)
         height = int(self.bottom - self.top)
-        rand_x = self.right + random.randint(0,width-1)
-        rand_y = self.top + random.randint(0,height-1)
+        rand_x = self.left + random.randint(0,width)
+        rand_y = self.top + random.randint(0,height)
         return_point = Point(rand_x, rand_y)
         assert self.contains(return_point)
         return return_point
