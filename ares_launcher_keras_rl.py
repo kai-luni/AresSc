@@ -3,9 +3,8 @@ import numpy as np
 from rl.agents.dqn import DQNAgent
 from rl.policy import LinearAnnealedPolicy, BoltzmannQPolicy, EpsGreedyQPolicy
 from rl.memory import SequentialMemory
-from rl.core import Processor
+
 from rl.callbacks import FileLogger, ModelIntervalCheckpoint
-from PIL import Image
 from keras.callbacks import TensorBoard
 from keras.models import Sequential, load_model, Model
 from keras.layers.core import Dense, Dropout, Activation, Flatten
@@ -18,35 +17,12 @@ from keras import backend as K
 
 
 from ares_env import AresEnv
-
+from ares_processor import AresProcessor
 
 INPUT_SHAPE = (64, 64)
-WINDOW_LENGTH = 4
+WINDOW_LENGTH = 6
 
-ares_env = AresEnv()
-
-
-class AresProcessor(Processor):
-    def process_observation(self, obs):
-        rgb_minimap = obs.observation['rgb_minimap']
-        assert rgb_minimap.ndim == 3  # (height, width, channel)
-        img = Image.fromarray(rgb_minimap.astype('uint8'))
-        img = img.convert('L')  # convert to grayscale
-        processed_observation = np.array(img)
-        assert processed_observation.shape == INPUT_SHAPE
-        return processed_observation.astype('uint8')  # saves storage in experience memory
-
-    def process_state_batch(self, batch):
-        # We could perform this processing step in `process_observation`. In this case, however,
-        # we would need to store a `float32` array instead, which is 4x more memory intensive than
-        # an `uint8` array. This matters if we store 1M observations.
-        processed_batch = (batch.astype('float32') / 128.)-1.
-        return processed_batch
-
-    def process_reward(self, reward):
-        #return np.clip(reward, -1., 1.)
-        return reward
-
+ares_env = AresEnv(INPUT_SHAPE)
 
 #minimap rgb
 # Next, we build our model. We use the same model that was described by Mnih et al. (2015).
@@ -70,6 +46,8 @@ model.add(Activation('relu'))
 model.add(Flatten())
 model.add(Dense(512))
 model.add(Activation('relu'))
+model.add(Dense(200))
+model.add(Activation('relu'))
 model.add(Dense(65))
 model.add(Activation('linear'))
 print(model.summary())
@@ -77,7 +55,7 @@ print(model.summary())
 # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
 # even the metrics!
 memory = SequentialMemory(limit=1000000, window_length=WINDOW_LENGTH)
-processor = AresProcessor()
+processor = AresProcessor(INPUT_SHAPE)
 
 # Select a policy. We use eps-greedy action selection, which means that a random action is selected
 # with probability eps. We anneal eps from 1.0 to 0.1 over the course of 1M steps. This is done so that
