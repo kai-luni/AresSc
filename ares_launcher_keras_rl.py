@@ -85,7 +85,7 @@ processor = AresProcessor()
 # (low eps). We also set a dedicated eps value that is used during testing. Note that we set it to 0.05
 # so that the agent still performs some random actions. This ensures that the agent cannot get stuck.
 policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.1, value_test=.05,
-                              nb_steps=100000)
+                              nb_steps=10000)
 
 # The trade-off between exploration and exploitation is difficult and an on-going research topic.
 # If you want, you can experiment with the parameters or use a different policy. Another popular one
@@ -97,7 +97,7 @@ dqn = DQNAgent(model=model, nb_actions=65, policy=policy, memory=memory,
                processor=processor, nb_steps_warmup=500, gamma=.99, target_model_update=2000,
                train_interval=4, delta_clip=1., enable_dueling_network=True)
 dqn.compile(Adam(lr=.00025), metrics=['mae'])
-dqn.load_weights('dqn__weights_72500.h5f')
+dqn.load_weights('dqn__weights_45000.h5f')
 
 # Okay, now it's time to learn something! We capture the interrupt exception so that training
 # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
