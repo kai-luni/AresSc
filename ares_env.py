@@ -7,6 +7,8 @@ from pysc2.lib import actions, features, units
 from scripts_ares.jaervsjoe_build_base import JaervsjoeBuildBase
 from map_matrix import get_eight_by_eight_matrix, get_coordinates_by_index
 from reward.reward_calculator import RewardCalculator
+from memory_episode_helper import MemoryEpisodeHelper
+from ares_processor import AresProcessor
 
 
 _NOT_QUEUED = [0]
@@ -31,13 +33,18 @@ ACTION_BUILD_MARINE = 'buildmarine'
 ACTION_ATTACK = 'attack'
 
 class AresEnv(Env):
-    def __init__(self):
+    def __init__(self, input_shape, memory):
         self.attack = False
         self.move_number = 0
         self.map_matrix = get_eight_by_eight_matrix(64, 64)
         self.reward_calculator = RewardCalculator()
 
         self.build_Bot = JaervsjoeBuildBase()
+
+        self.memory = memory #main memory for training
+        self.memory_helper = MemoryEpisodeHelper()
+
+        self.ares_processor = AresProcessor(input_shape)
 
         #this is the pysc2 environment that interacts with the game
         self.pysc2_env = sc2_env.SC2Env(
@@ -65,14 +72,20 @@ class AresEnv(Env):
         reward = 0.0
         #each roundtrip consists of 6 steps, 3 attack and 3 build steps
         for i in range(6):
-            
+            #every x steps: add a super episode
+            if random.randrange(500) == 1:
+                self.memory_helper.load_random_episode_into_other_memory(self.memory)
+
             if obs.last():
                 self.last_obs = self.pysc2_env.reset()[0]
+                self.memory_helper.save_episode(obs.observation['score_cumulative'][0])
                 return self.last_obs, obs.reward, True, {}
 
             if obs.first():
                 #important: reset reward calculator
                 self.reward_calculator = RewardCalculator()
+                #and the memory helper
+                self.memory_helper = MemoryEpisodeHelper()
 
             reward += self.reward_calculator.get_reward_from_observation(obs)
 
@@ -94,6 +107,7 @@ class AresEnv(Env):
             obs = self.pysc2_env.step([value])[0]
 
         self.last_obs = obs
+        self.memory_helper.append(self.ares_processor.process_observation(obs), action, reward, obs.last())
         return obs, reward, False, {}
 
     def reset(self):
