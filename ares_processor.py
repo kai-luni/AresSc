@@ -9,11 +9,11 @@ class AresProcessor(Processor):
     def process_observation(self, obs):
         rgb_minimap = obs.observation['rgb_minimap']
         assert rgb_minimap.ndim == 3  # (height, width, channel)
-        img = Image.fromarray(rgb_minimap.astype('uint8'))
-        img = img.convert('L')  # convert to grayscale
-        processed_observation = np.array(img)
-        assert processed_observation.shape == self.input_shape
-        return processed_observation.astype('uint8')  # saves storage in experience memory
+        # img = Image.fromarray(rgb_minimap.astype('uint8'))
+        # img = img.convert('L')  # convert to grayscale
+        # processed_observation = np.array(img)
+        assert rgb_minimap.shape == self.input_shape
+        return rgb_minimap.astype('uint8')  # saves storage in experience memory
 
     def process_state_batch(self, batch):
         # We could perform this processing step in `process_observation`. In this case, however,
