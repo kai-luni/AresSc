@@ -1,3 +1,9 @@
+Alpha 3
+- find a way to build when the screen was moved
+- build script: rebuild comman center, third supply depot
+- Reading some variable out of a config file, so I can change values in runtime.
+- Save good episodes in pickle files and load them into memory of replay
+
 Alpha 2
 
 Problem: Its hard to put all the action space in one level. Right now its like this: 0-3 are simple tasks like to build a 

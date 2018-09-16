@@ -22,7 +22,7 @@ from ares_processor import AresProcessor
 INPUT_SHAPE = (64, 64)
 WINDOW_LENGTH = 6
 
-ares_env = AresEnv(INPUT_SHAPE)
+
 
 #minimap rgb
 # Next, we build our model. We use the same model that was described by Mnih et al. (2015).
@@ -54,8 +54,9 @@ print(model.summary())
 
 # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
 # even the metrics!
-memory = SequentialMemory(limit=1000000, window_length=WINDOW_LENGTH)
+memory = SequentialMemory(limit=100000, window_length=WINDOW_LENGTH)
 processor = AresProcessor(INPUT_SHAPE)
+ares_env = AresEnv(INPUT_SHAPE, memory)
 
 # Select a policy. We use eps-greedy action selection, which means that a random action is selected
 # with probability eps. We anneal eps from 1.0 to 0.1 over the course of 1M steps. This is done so that
@@ -63,7 +64,7 @@ processor = AresProcessor(INPUT_SHAPE)
 # (low eps). We also set a dedicated eps value that is used during testing. Note that we set it to 0.05
 # so that the agent still performs some random actions. This ensures that the agent cannot get stuck.
 policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.1, value_test=.05,
-                              nb_steps=10000)
+                              nb_steps=2000)
 
 # The trade-off between exploration and exploitation is difficult and an on-going research topic.
 # If you want, you can experiment with the parameters or use a different policy. Another popular one
@@ -72,19 +73,19 @@ policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., valu
 # Feel free to give it a try!
 
 dqn = DQNAgent(model=model, nb_actions=65, policy=policy, memory=memory,
-               processor=processor, nb_steps_warmup=500, gamma=.99, target_model_update=2000,
-               train_interval=4, delta_clip=1., enable_dueling_network=True)
+               processor=processor, nb_steps_warmup=0, gamma=.995, target_model_update=2000,
+               train_interval=80, delta_clip=1., enable_dueling_network=True, batch_size=200)
 dqn.compile(Adam(lr=.00025), metrics=['mae'])
-dqn.load_weights('dqn__weights_45000.h5f')
+dqn.load_weights('dqn__weights_230000.h5f')
 
 # Okay, now it's time to learn something! We capture the interrupt exception so that training
 # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
 weights_filename = 'dqn__weights.h5f'
 checkpoint_weights_filename = 'dqn__weights_{step}.h5f'
 log_filename = 'dqn__log.json'
-callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=2500)]
+callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=10000)]
 callbacks += [FileLogger(log_filename, interval=100)]
-dqn.fit(ares_env, callbacks=callbacks, nb_steps=175000, log_interval=10000, verbose=2)
+dqn.fit(ares_env, callbacks=callbacks, nb_steps=500000, log_interval=10000, verbose=2)
 
 # After training is done, we save the final weights one more time.
 dqn.save_weights(weights_filename, overwrite=True)

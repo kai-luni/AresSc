@@ -43,6 +43,9 @@ class AresEnv(Env):
 
         self.memory = memory #main memory for training
         self.memory_helper = MemoryEpisodeHelper()
+        for i in range(40):
+            self.memory_helper.load_random_episode_into_other_memory(self.memory)
+
 
         self.ares_processor = AresProcessor(input_shape)
 
@@ -50,7 +53,7 @@ class AresEnv(Env):
         self.pysc2_env = sc2_env.SC2Env(
                 map_name="Simple64",
                 players=[sc2_env.Agent(sc2_env.Race.terran), sc2_env.Bot(sc2_env.Race.random, sc2_env.Difficulty.easy)],
-                agent_interface_format=features.AgentInterfaceFormat(feature_dimensions=features.Dimensions(screen=84, minimap=64), rgb_dimensions=features.Dimensions(screen=196, minimap=64), action_space=actions.ActionSpace.FEATURES, use_feature_units=True),
+                agent_interface_format=features.AgentInterfaceFormat(feature_dimensions=features.Dimensions(screen=84, minimap=64), rgb_dimensions=features.Dimensions(screen=384, minimap=64), action_space=actions.ActionSpace.FEATURES, use_feature_units=True),
                 step_mul=8,
                 game_steps_per_episode=0,
                 visualize=False)   
@@ -73,11 +76,12 @@ class AresEnv(Env):
         #each roundtrip consists of 6 steps, 3 attack and 3 build steps
         for i in range(6):
             #every x steps: add a super episode
-            if random.randrange(500) == 1:
+            if random.randrange(1200) == 1:
                 self.memory_helper.load_random_episode_into_other_memory(self.memory)
 
             if obs.last():
                 self.last_obs = self.pysc2_env.reset()[0]
+                self.memory_helper.append(self.ares_processor.process_observation(obs), action, reward, obs.last())
                 self.memory_helper.save_episode(obs.observation['score_cumulative'][0])
                 return self.last_obs, obs.reward, True, {}
 
