@@ -2,7 +2,9 @@ Alpha 3
 - find a way to build when the screen was moved
 - build script: rebuild comman center, third supply depot
 - Reading some variable out of a config file, so I can change values in runtime.
-- Save good episodes in pickle files and load them into memory of replay
+- use open ai baselines: PPO2
+- check issue: switched coordinates
+- parallel envs
 
 Alpha 2
 

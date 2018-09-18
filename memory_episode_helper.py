@@ -6,8 +6,9 @@ from os.path import isfile, join
 import pickle
 import random
 import sys
+import os
 
-from processors.ares_processor import AresProcessor
+from ares_processor import AresProcessor
 
 class MemoryEpisodeHelper(Memory):
     """Handle custom memory activities, episode related."""
@@ -18,10 +19,10 @@ class MemoryEpisodeHelper(Memory):
 
         # Do not use deque to implement the memory. This data structure may seem convenient but
         # it is way too slow on random access. Instead, we use our own ring buffer implementation.
-        self.actions = RingBuffer(self.limit)
-        self.rewards = RingBuffer(self.limit)
-        self.terminals = RingBuffer(self.limit)
-        self.observations = RingBuffer(self.limit)
+        self.actions = []
+        self.rewards = []
+        self.terminals = []
+        self.observations = []
 
     def append(self, observation, action, reward, terminal, training=True):
         """Append an observation to the memory
@@ -31,7 +32,7 @@ class MemoryEpisodeHelper(Memory):
             reward (float): Reward obtained by taking this action
             terminal (boolean): Is the state terminal
         """ 
-        super(MemoryEpisodeHelper, self).append(observation, action, reward, terminal, training=training)
+        #super(MemoryEpisodeHelper, self).append(observation, action, reward, terminal, training=training)
         
         # This needs to be understood as follows: in `observation`, take `action`, obtain `reward`
         self.observations.append(observation)
@@ -41,25 +42,35 @@ class MemoryEpisodeHelper(Memory):
 
     def save_episode(self, game_score):
         """store the whole episode in a pickle file with a unique name"""
+        if game_score < 8000: 
+            return
         memory_episode = {}
-        memory_episode["actions"] = self.actions.data
-        memory_episode["rewards"] = self.rewards.data
-        memory_episode["terminals"] = self.terminals.data
-        memory_episode["observations"] = self.observations.data
+        memory_episode["actions"] = self.actions
+        memory_episode["rewards"] = self.rewards
+        memory_episode["terminals"] = self.terminals
+        memory_episode["observations"] = self.observations
+        # for i in range(len(memory_episode["terminals"])):
+        #     print(str(memory_episode["terminals"][i]))
         assert memory_episode["terminals"][len(memory_episode["terminals"])-1]
-        pickle.dump(memory_episode, open(self.foldername_episodes_super + '_' + self.version + '/' + str(game_score) + '_' + str(time()) + '.p', 'wb'), protocol=pickle.HIGHEST_PROTOCOL) 
+        folder_name = self.foldername_episodes_super + '_' + self.version
+        if not os.path.exists(folder_name):
+            os.makedirs(folder_name)
+        pickle.dump(memory_episode, open(folder_name + '/' + str(game_score) + '_' + str(time()) + '.p', 'wb'), protocol=pickle.HIGHEST_PROTOCOL) 
 
     def load_random_episode_into_other_memory(self, memory):
         try:
-            onlyfiles = [f for f in listdir(self.foldername_episodes_super + self.version) if isfile(join(self.foldername_episodes_super, f))]
+            folder_name = self.foldername_episodes_super + '_' + self.version
+            if not os.path.exists(folder_name):
+                os.makedirs(folder_name)
+            onlyfiles = [f for f in listdir(folder_name) if isfile(join(folder_name, f))]
             if(len(onlyfiles) is 0):
                 return[]
             chosen_file_index = random.randint(0, len(onlyfiles)-1)
             filename = onlyfiles[chosen_file_index]
-            memory_episode = pickle.load(open(join(self.foldername_episodes_super, filename), 'rb'))
+            memory_episode = pickle.load(open(join(folder_name, filename), 'rb'))
             assert memory_episode["terminals"][len(memory_episode["terminals"])-1]
             for i in range(len(memory_episode["actions"])):
-                memory.append(memory_episode["actions"][i], memory_episode["rewards"][i], memory_episode["terminals"][i], memory_episode["observations"][i], True)
+                memory.append(memory_episode["observations"][i], memory_episode["actions"][i], memory_episode["rewards"][i], memory_episode["terminals"][i], True)
             return True
         except Exception as e:
             print("error loading super episode: " + str(e))

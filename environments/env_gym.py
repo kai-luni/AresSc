@@ -36,8 +36,9 @@ ACTION_BUILD_MARINE = 'buildmarine'
 ACTION_ATTACK = 'attack'
 
 class AresEnvGym(gym.Env):
-    def __init__(self, input_shape):
+    def __init__(self, input_shape, id):
         super(AresEnvGym, self).__init__()
+        self.id = id
         # Define action and observation space
         # They must be gym.spaces objects
         # Example when using discrete actions:
@@ -47,6 +48,7 @@ class AresEnvGym(gym.Env):
 
         self.attack = False
         self.move_number = 0
+        self.episode_reward = 0.
         self.map_matrix = get_eight_by_eight_matrix(64, 64)
         self.reward_calculator = RewardCalculator()
 
@@ -59,7 +61,7 @@ class AresEnvGym(gym.Env):
         self.pysc2_env = sc2_env.SC2Env(
                 map_name="Simple64",
                 players=[sc2_env.Agent(sc2_env.Race.terran), sc2_env.Bot(sc2_env.Race.random, sc2_env.Difficulty.easy)],
-                agent_interface_format=features.AgentInterfaceFormat(feature_dimensions=features.Dimensions(screen=84, minimap=64), rgb_dimensions=features.Dimensions(screen=384, minimap=64), action_space=actions.ActionSpace.FEATURES, use_feature_units=True),
+                agent_interface_format=features.AgentInterfaceFormat(feature_dimensions=features.Dimensions(screen=84, minimap=64), rgb_dimensions=features.Dimensions(screen=128, minimap=64), action_space=actions.ActionSpace.FEATURES, use_feature_units=True),
                 step_mul=8,
                 game_steps_per_episode=0,
                 visualize=False)   
@@ -82,13 +84,18 @@ class AresEnvGym(gym.Env):
         #each roundtrip consists of 6 steps, 3 attack and 3 build steps
         for i in range(6):
             if obs.last():
+                print("reward: " + str(self.episode_reward))
+                self.episode_reward = 0.
                 self.last_obs = self.pysc2_env.reset()[0]
                 return self.last_obs, obs.reward, True, {}
 
             if obs.first():
                 #important: reset reward calculator
                 self.reward_calculator = RewardCalculator()
-            reward += self.reward_calculator.get_reward_from_observation(obs)
+
+            reward_round = self.reward_calculator.get_reward_from_observation(obs)
+            reward += reward_round
+            self.episode_reward += reward_round
 
             if i == 0:
                 value = self.build_Bot.moveNumberZero(obs)
@@ -119,7 +126,7 @@ class AresEnvGym(gym.Env):
         # Returns
             observation (object): The initial observation of the space. Initial reward is assumed to be 0.
         """
-        return self.pysc2_env.reset()[0]
+        return self.ares_processor.process_observation(self.pysc2_env.reset()[0])
 
 
     def render(self, mode='human', close=False):
@@ -131,7 +138,7 @@ class AresEnvGym(gym.Env):
             mode (str): The mode to render with.
             close (bool): Close all open renderings.
         """
-        print('do nothing')
+        pass
 
     def close(self):
         """Override in your subclass to perform any necessary cleanup.

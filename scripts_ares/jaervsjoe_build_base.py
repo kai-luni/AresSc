@@ -97,9 +97,7 @@ class JaervsjoeBuildBase:
         commCenter = get_random_unit(obs, units.Terran.CommandCenter)
         if commCenter is None:
             return actions.FunctionCall(actions.FUNCTIONS.no_op.id, [])
-        assert commCenter.x > 0 and commCenter.x < 64
-        test = base_is_upper_left(obs)
-        base_upper_left = commCenter.x <= 31
+        assert commCenter.x > 0
 
         if smart_action == ActionBaseDto.build_supply_depot():
             if (actions.FUNCTIONS.Build_SupplyDepot_screen.id in obs.observation.available_actions):
