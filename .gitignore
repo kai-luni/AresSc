@@ -1,19 +1,7 @@
 
 logs/
 model/
-
 helper_functions/__pycache__
 __pycache__/
-
-
-__pycache__/deep_agent.cpython-35.pyc
-__pycache__/map_matrix.cpython-35.pyc
-__pycache__/point_rect.cpython-35.pyc
-__pycache__/q_agent.cpython-35.pyc
-
 .vscode/
-super_episodes/
-/__pycache__/ares_agent.cpython-35.pyc
-/model/exploration_rate.p
-/model/exploration_rate.p
-/reward/__pycache__/reward_calculator.cpython-35.pyc
+
