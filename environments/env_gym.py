@@ -35,6 +35,9 @@ ACTION_BUILD_BARRACKS = 'buildbarracks'
 ACTION_BUILD_MARINE = 'buildmarine'
 ACTION_ATTACK = 'attack'
 
+OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' # formats are comma-separated, but for tensorboard you only really need the last one
+OPENAI_LOGDIR='log_baselines/'
+
 class AresEnvGym(gym.Env):
     def __init__(self, input_shape, id):
         super(AresEnvGym, self).__init__()
@@ -45,7 +48,7 @@ class AresEnvGym(gym.Env):
         self.action_space = spaces.Discrete(65)
         # Example for using image as input:
         self.observation_space = spaces.Box(low=0, high=255, shape=input_shape, dtype=np.uint8)
-
+        print(input_shape)
         self.attack = False
         self.move_number = 0
         self.episode_reward = 0.
@@ -61,9 +64,9 @@ class AresEnvGym(gym.Env):
         self.pysc2_env = sc2_env.SC2Env(
                 map_name="Simple64",
                 players=[sc2_env.Agent(sc2_env.Race.terran), sc2_env.Bot(sc2_env.Race.random, sc2_env.Difficulty.easy)],
-                agent_interface_format=features.AgentInterfaceFormat(feature_dimensions=features.Dimensions(screen=84, minimap=64), rgb_dimensions=features.Dimensions(screen=128, minimap=64), action_space=actions.ActionSpace.FEATURES, use_feature_units=True),
-                step_mul=8,
-                game_steps_per_episode=0,
+                agent_interface_format=features.AgentInterfaceFormat(feature_dimensions=features.Dimensions(screen=84, minimap=64), rgb_dimensions=features.Dimensions(screen=64, minimap=64), action_space=actions.ActionSpace.FEATURES, use_feature_units=True),
+                step_mul=6,
+                game_steps_per_episode=40000,
                 visualize=False)   
         self.last_obs = self.pysc2_env.reset()[0]     
     def step(self, action):
@@ -87,7 +90,9 @@ class AresEnvGym(gym.Env):
                 print("reward: " + str(self.episode_reward))
                 self.episode_reward = 0.
                 self.last_obs = self.pysc2_env.reset()[0]
+                print("episode finished")
                 return self.last_obs, obs.reward, True, {}
+            
 
             if obs.first():
                 #important: reset reward calculator

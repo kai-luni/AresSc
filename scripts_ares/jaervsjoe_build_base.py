@@ -23,30 +23,6 @@ class JaervsjoeBuildBase:
         self.previous_action = None   
         self.move_number = 0    
 
-    # def step(self, obs):
-    #     if obs.first():
-    #         player_y, player_x = (obs.observation.feature_minimap.player_relative == features.PlayerRelative.SELF).nonzero()
-    #         xmean = player_x.mean()
-    #         ymean = player_y.mean()
-      
-    #         if xmean <= 31 and ymean <= 31:
-    #             self.base_top_left = 1
-    #         else:
-    #             self.base_top_left = 0
-
-    #         if self.move_number == 0:
-    #             self.move_number += 1
-    #             value = self.moveNumberZero(obs)
-    #         elif self.move_number == 1:
-    #             self.move_number += 1
-    #             value =  self.moveNumberOne(obs)
-    #         elif self.move_number == 2:
-    #             self.move_number = 0
-    #             self.attack = not self.attack
-    #             value =  self.moveNumberTwo(obs)
-    #         else:
-    #             value = actions.FunctionCall(_NO_OP, [])
-    #     return value
     def act_build_base(self, current_state_others):
         #TODO: build command center
         command_center_count = current_state_others[0]
@@ -79,10 +55,16 @@ class JaervsjoeBuildBase:
         if smart_action == ActionBaseDto.build_barracks() or smart_action == ActionBaseDto.build_supply_depot():
             scv = get_random_unit(obs, units.Terran.SCV)
 
-            # if(scv is None):
-            #     raise Exception("could not select unit.")
-            if(scv is not None):
-                return actions.FUNCTIONS.select_point("select", (scv.x, scv.y))
+            if(scv is  None):    
+                return actions.FunctionCall(actions.FUNCTIONS.no_op.id, [])
+
+            x = scv.x
+            y = scv.y
+            #TODO: same for larger than...
+            if(x < 0 or y < 0):
+                return actions.FunctionCall(actions.FUNCTIONS.no_op.id, [])
+
+            return actions.FUNCTIONS.select_point("select", (scv.x, scv.y))
             
         elif smart_action == ActionBaseDto.build_marine():
             barrack = get_random_unit(obs, units.Terran.Barracks)

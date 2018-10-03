@@ -8,12 +8,17 @@ class AresProcessor(Processor):
         self.input_shape = input_shape
     def process_observation(self, obs):
         rgb_minimap = obs.observation['rgb_minimap']
-        assert rgb_minimap.ndim == 3  # (height, width, channel)
+        return rgb_minimap
+        # assert rgb_minimap.ndim == 3  # (height, width, channel)
         # img = Image.fromarray(rgb_minimap.astype('uint8'))
         # img = img.convert('L')  # convert to grayscale
-        # processed_observation = np.array(img)
-        assert rgb_minimap.shape == self.input_shape
-        return rgb_minimap.astype('uint8')  # saves storage in experience memory
+        # processed_observation = np.array(img).reshape(self.input_shape)
+        # processed_observation = processed_observation.astype("float") / 255.0
+        # print(processed_observation.shape)
+        # print(self.input_shape)
+        #assert processed_observation.shape == self.input_shape
+        #return rgb_minimap.astype('uint8')  # saves storage in experience memory
+        return processed_observation
 
     def process_state_batch(self, batch):
         # We could perform this processing step in `process_observation`. In this case, however,
@@ -22,7 +27,7 @@ class AresProcessor(Processor):
         # for i in range(len(batch)):
         #     test = batch[i]
         #     print(test)
-        processed_batch = (batch.astype('float32') / 128.)-1.
+        #processed_batch = (batch.astype('float32') / 128.)-1.
         return processed_batch
 
     def process_reward(self, reward):
