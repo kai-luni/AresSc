@@ -16,6 +16,7 @@ from baselines.common.mpi_adam_optimizer import MpiAdamOptimizer
 from mpi4py import MPI
 from baselines.common.tf_util import initialize
 from baselines.common.mpi_util import sync_from_root
+import math
 
 class Model(object):
     """
@@ -305,6 +306,7 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
                     max_grad_norm=max_grad_norm)
     model = make_model()
     if load_path is not None:
+        print("load " + load_path)
         model.load(load_path)
     # Instantiate the runner object
     runner = Runner(env=env, model=model, nsteps=nsteps, gamma=gamma, lam=lam)
@@ -397,9 +399,11 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
                 logger.dumpkvs()
 
             #get reward of last ... timesteps and make a mean value, multiply and parse to int for filename
-            reward_mean = int(safemean([epinfo['r'] for epinfo in epinfobuf]) * 1000)
-            if(reward_mean > 0):
-                model.save(str() + "_ppo_cnn_lstm_384_easy")
+            reward_mean_temp = safemean([epinfo['r'] for epinfo in epinfobuf])
+            if(not math.isnan(reward_mean_temp)):
+                reward_mean = int(reward_mean_temp * 1000)
+                if(reward_mean > 0):
+                    model.save(str(reward_mean) + "_ppo_cnn_lstm_384_easy")
 
         if save_interval and (update % save_interval == 0 or update == 1) and logger.get_dir() and MPI.COMM_WORLD.Get_rank() == 0:
             checkdir = osp.join(logger.get_dir(), 'checkpoints')

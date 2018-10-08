@@ -90,7 +90,6 @@ class AresEnvGym(gym.Env):
                 print("reward: " + str(self.episode_reward))
                 self.episode_reward = 0.
                 self.last_obs = self.pysc2_env.reset()[0]
-                print("episode finished")
                 return self.last_obs, obs.reward, True, {}
             
 
