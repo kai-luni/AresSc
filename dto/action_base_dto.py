@@ -26,9 +26,15 @@ class ActionBaseDto:
         return 'build_supply_depot'
 
     @staticmethod
+    def build_command_center():
+        return 'builld_command_center'
+
+    @staticmethod
     def build_barracks():
         return 'build_barracks'
 
     @staticmethod
     def build_marine():
         return 'builld_marine'
+
+    

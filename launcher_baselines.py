@@ -10,9 +10,11 @@ from functools import partial
 from baselines_ares.custom_ppo2 import learn as ppo_learn
 from environments.env_gym import AresEnvGym
 
-
-
 def make_sc2env(env_id=0, **kwargs):
+    import sys
+    from absl import flags
+    FLAGS = flags.FLAGS
+    FLAGS(sys.argv)
     return Monitor(AresEnvGym((64, 64, 3), env_id), 'log.csv', allow_early_resets=True)
 
 def train():
@@ -45,7 +47,7 @@ def play():
                     nsteps=nsteps, ent_coef=ent_coef, vf_coef=vf_coef,
                     max_grad_norm=max_grad_norm)
     model = make_model()
-    model.load("lstm_ppo")
+    model.load("3780_ppo_cnn_lstm_384_easy")
 
     ob = pysc2_env_vec.reset()
     state = model.initial_state
@@ -54,7 +56,7 @@ def play():
 
     # run a single episode until the end (i.e. until done)
     while True:
-        print(step_counter)
+        #print(step_counter)
         action, _, state, _ = model.step(ob, S=state, M=done)
         ob, reward, done, _ = pysc2_env_vec.step(action)
         step_counter += 1
@@ -72,4 +74,4 @@ def play():
     # model.save("lstm_ppo")
 
 if __name__ == '__main__':   
-    train()
+    play()

@@ -20,11 +20,12 @@ def get_current_state(obs):
     barracks_count = get_count_unit(obs, units.Terran.Barracks)
     current_state = []
     current_state.append(normalize(get_count_unit(obs, units.Terran.CommandCenter), 0, 1))
-    current_state.append(normalize(supply_depot_count, 0, 2))
+    current_state.append(normalize(supply_depot_count, 0, 3))
     current_state.append(normalize(barracks_count, 0, 2))
     army_supply = obs.observation['player'][_ARMY_SUPPLY]
-    current_state.append(normalize(army_supply, 0, 19))
-    rgb_minimap = (obs.observation['rgb_minimap'] / 128) - 1
+    current_state.append(normalize(army_supply, 0, 27))
+    #rgb_minimap = (obs.observation['rgb_minimap'] / 128) - 1
+    rgb_minimap = obs.observation['rgb_minimap']
 
     #raise Exception("4: resources")
 

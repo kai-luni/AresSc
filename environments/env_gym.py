@@ -9,9 +9,11 @@ from pysc2.lib import actions, features, units
 
 from scripts_ares.jaervsjoe_build_base import JaervsjoeBuildBase
 from map_matrix import get_eight_by_eight_matrix, get_coordinates_by_index
+from helper_functions.obs_helper import get_current_state, get_random_unit, get_count_unit, base_is_upper_left
 from reward.reward_calculator import RewardCalculator
 from memory_episode_helper import MemoryEpisodeHelper
 from ares_processor import AresProcessor
+from point_rect import Point
 
 
 _NOT_QUEUED = [0]
@@ -48,7 +50,6 @@ class AresEnvGym(gym.Env):
         self.action_space = spaces.Discrete(65)
         # Example for using image as input:
         self.observation_space = spaces.Box(low=0, high=255, shape=input_shape, dtype=np.uint8)
-        print(input_shape)
         self.attack = False
         self.move_number = 0
         self.episode_reward = 0.
@@ -64,7 +65,7 @@ class AresEnvGym(gym.Env):
         self.pysc2_env = sc2_env.SC2Env(
                 map_name="Simple64",
                 players=[sc2_env.Agent(sc2_env.Race.terran), sc2_env.Bot(sc2_env.Race.random, sc2_env.Difficulty.easy)],
-                agent_interface_format=features.AgentInterfaceFormat(feature_dimensions=features.Dimensions(screen=84, minimap=64), rgb_dimensions=features.Dimensions(screen=64, minimap=64), action_space=actions.ActionSpace.FEATURES, use_feature_units=True),
+                agent_interface_format=features.AgentInterfaceFormat(feature_dimensions=features.Dimensions(screen=84, minimap=64), rgb_dimensions=features.Dimensions(screen=512, minimap=64), action_space=actions.ActionSpace.FEATURES, use_feature_units=True, use_camera_position=True),
                 step_mul=6,
                 game_steps_per_episode=40000,
                 visualize=False)   
@@ -91,31 +92,39 @@ class AresEnvGym(gym.Env):
                 self.episode_reward = 0.
                 self.last_obs = self.pysc2_env.reset()[0]
                 return self.last_obs, obs.reward, True, {}
-            
-
+                
             if obs.first():
                 #important: reset reward calculator
                 self.reward_calculator = RewardCalculator()
+                self.build_Bot.camera_position_start = Point((obs.observation["camera_position"][0]/3)*2, (obs.observation["camera_position"][1]/3)*2)
+                command_center = get_random_unit(obs, units.Terran.CommandCenter)
+                self.build_Bot.position_cc_start = Point(command_center.x, command_center.y)
+                print("set camera to " + str(self.build_Bot.camera_position_start.x) + " and " + str(self.build_Bot.camera_position_start.y))
+                print("set base to " + str(self.build_Bot.position_cc_start.x) +  " and " + str(self.build_Bot.position_cc_start.y))
 
             reward_round = self.reward_calculator.get_reward_from_observation(obs)
             reward += reward_round
             self.episode_reward += reward_round
 
             if i == 0:
-                value = self.build_Bot.moveNumberZero(obs)
+                #value =  actions.FunctionCall(_NO_OP, [])
+                value = self.build_Bot.moveNumberZeroZero(obs)
             elif i == 1:
-                value =  self.build_Bot.moveNumberOne(obs)
+                test = Point((obs.observation["camera_position"][0]/3)*2, (obs.observation["camera_position"][1]/3)*2)
+                value = self.build_Bot.moveNumberZero(obs)
             elif i == 2:
+                value =  self.build_Bot.moveNumberOne(obs)
+            elif i == 3:
                 value =  self.build_Bot.moveNumberTwo(obs)
             elif action == 64:
                 #action 64 is no action
                 value =  actions.FunctionCall(_NO_OP, [])
-            elif i == 3:
-                value = self.moveNumberZero(obs)
             elif i == 4:
-                value =  self.moveNumberOne(obs, action)
+                value = self.moveNumberZero(obs)
             elif i == 5:
-                value =  actions.FunctionCall(_NO_OP, [])
+                value =  self.moveNumberOne(obs, action)
+                
+                #value =  actions.FunctionCall(_NO_OP, [])
             obs = self.pysc2_env.step([value])[0]
 
         self.last_obs = obs
