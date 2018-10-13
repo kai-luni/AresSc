@@ -19,10 +19,10 @@ def make_sc2env(env_id=0, **kwargs):
 
 def train():
     env_args = dict()
-    network_kwargs = dict(nlstm=384)
-    number_envs = 6
+    network_kwargs = dict(nlstm=512)
+    number_envs = 8
     pysc2_env_vec = SubprocVecEnv([partial(make_sc2env, id=i, **env_args) for i in range(number_envs)])
-    model = ppo_learn(network="cnn_lstm", env=pysc2_env_vec, total_timesteps=500000, gamma=0.995, nsteps=256, nminibatches=number_envs, load_path='3790_ppo_cnn_lstm_384_easy', **network_kwargs)
+    model = ppo_learn(network="cnn_lstm", env=pysc2_env_vec, total_timesteps=1500000, gamma=0.995, nsteps=192, nminibatches=number_envs, load_path="1420_ppo_cnn_lstm_384_easy", **network_kwargs)
     model.save("lstm_ppo")
 
 def play():
@@ -74,4 +74,4 @@ def play():
     # model.save("lstm_ppo")
 
 if __name__ == '__main__':   
-    play()
+    train()

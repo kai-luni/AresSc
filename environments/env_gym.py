@@ -65,7 +65,7 @@ class AresEnvGym(gym.Env):
         self.pysc2_env = sc2_env.SC2Env(
                 map_name="Simple64",
                 players=[sc2_env.Agent(sc2_env.Race.terran), sc2_env.Bot(sc2_env.Race.random, sc2_env.Difficulty.easy)],
-                agent_interface_format=features.AgentInterfaceFormat(feature_dimensions=features.Dimensions(screen=84, minimap=64), rgb_dimensions=features.Dimensions(screen=512, minimap=64), action_space=actions.ActionSpace.FEATURES, use_feature_units=True, use_camera_position=True),
+                agent_interface_format=features.AgentInterfaceFormat(feature_dimensions=features.Dimensions(screen=84, minimap=64), rgb_dimensions=features.Dimensions(screen=64, minimap=64), action_space=actions.ActionSpace.FEATURES, use_feature_units=True, use_camera_position=True),
                 step_mul=6,
                 game_steps_per_episode=40000,
                 visualize=False)   
@@ -99,8 +99,6 @@ class AresEnvGym(gym.Env):
                 self.build_Bot.camera_position_start = Point((obs.observation["camera_position"][0]/3)*2, (obs.observation["camera_position"][1]/3)*2)
                 command_center = get_random_unit(obs, units.Terran.CommandCenter)
                 self.build_Bot.position_cc_start = Point(command_center.x, command_center.y)
-                print("set camera to " + str(self.build_Bot.camera_position_start.x) + " and " + str(self.build_Bot.camera_position_start.y))
-                print("set base to " + str(self.build_Bot.position_cc_start.x) +  " and " + str(self.build_Bot.position_cc_start.y))
 
             reward_round = self.reward_calculator.get_reward_from_observation(obs)
             reward += reward_round
