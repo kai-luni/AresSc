@@ -11,7 +11,6 @@ from scripts_ares.jaervsjoe_build_base import JaervsjoeBuildBase
 from map_matrix import get_eight_by_eight_matrix, get_coordinates_by_index
 from helper_functions.obs_helper import get_current_state, get_random_unit, get_count_unit, base_is_upper_left
 from reward.reward_calculator import RewardCalculator
-from memory_episode_helper import MemoryEpisodeHelper
 from ares_processor import AresProcessor
 from point_rect import Point
 
@@ -55,6 +54,8 @@ class AresEnvGym(gym.Env):
         self.episode_reward = 0.
         self.map_matrix = get_eight_by_eight_matrix(64, 64)
         self.reward_calculator = RewardCalculator()
+        #this will be True on the second step
+        self.second_step = False
 
         self.build_Bot = JaervsjoeBuildBase()
 
@@ -92,11 +93,16 @@ class AresEnvGym(gym.Env):
                 self.episode_reward = 0.
                 self.last_obs = self.pysc2_env.reset()[0]
                 return self.last_obs, obs.reward, True, {}
-                
+
+            if self.second_step:
+                #get the camera position on the second step, on the first step it is sometimes wrong
+                self.build_Bot.camera_position_start = Point((obs.observation["camera_position"][0]/3)*2, (obs.observation["camera_position"][1]/3)*2)
+                self.second_step = False
+
             if obs.first():
                 #important: reset reward calculator
                 self.reward_calculator = RewardCalculator()
-                self.build_Bot.camera_position_start = Point((obs.observation["camera_position"][0]/3)*2, (obs.observation["camera_position"][1]/3)*2)
+                self.second_step = True
                 command_center = get_random_unit(obs, units.Terran.CommandCenter)
                 self.build_Bot.position_cc_start = Point(command_center.x, command_center.y)
 
@@ -105,8 +111,10 @@ class AresEnvGym(gym.Env):
             self.episode_reward += reward_round
 
             if i == 0:
-                #value =  actions.FunctionCall(_NO_OP, [])
-                value = self.build_Bot.moveNumberZeroZero(obs)
+                if obs.first():
+                    value =  actions.FunctionCall(_NO_OP, [])
+                else:
+                    value = self.build_Bot.moveNumberZeroZero(obs)
             elif i == 1:
                 test = Point((obs.observation["camera_position"][0]/3)*2, (obs.observation["camera_position"][1]/3)*2)
                 value = self.build_Bot.moveNumberZero(obs)

@@ -1,14 +1,32 @@
-import tensorflow as tf
-from baselines.common import policies, models, cmd_util
 from baselines.common.vec_env.dummy_vec_env import DummyVecEnv
-from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
-from baselines.run import get_learn_function
-from baselines.bench import Monitor
+from baselines.common import policies, models, cmd_util
 from baselines.ppo2.ppo2 import Model as ppo_model
+from baselines.bench import Monitor
 from functools import partial
 
-from baselines_ares.custom_ppo2 import learn as ppo_learn
 from environments.env_gym import AresEnvGym
+
+
+
+
+
+import imageio
+import numpy as np
+
+
+# model = A2C(MlpPolicy, "LunarLander-v2").learn(100000)
+
+# images = []
+# obs = model.env.reset()
+# img = model.env.render(mode='rgb_array')
+# for i in range(350):
+#     images.append(img)
+#     action, _ = model.predict(obs)
+#     obs, _, _ ,_ = model.env.step(action)
+#     img = model.env.render(mode='rgb_array')
+
+# imageio.mimsave('lander_a2c.gif', [np.array(img[0]) for i, img in enumerate(images) if i%2 == 0], fps=29)
+
 
 def make_sc2env(env_id=0, **kwargs):
     import sys
@@ -17,20 +35,12 @@ def make_sc2env(env_id=0, **kwargs):
     FLAGS(sys.argv)
     return Monitor(AresEnvGym((64, 64, 3), env_id), 'log.csv', allow_early_resets=True)
 
-def train():
-    env_args = dict()
-    network_kwargs = dict(nlstm=512)
-    number_envs = 8
-    pysc2_env_vec = SubprocVecEnv([partial(make_sc2env, id=i, **env_args) for i in range(number_envs)])
-    model = ppo_learn(network="cnn_lstm", env=pysc2_env_vec, total_timesteps=1500000, gamma=0.995, nsteps=192, nminibatches=number_envs, load_path="1420_ppo_cnn_lstm_384_easy", **network_kwargs)
-    model.save("lstm_ppo")
-
 def play():
     env_args = dict()
     network_kwargs = dict(nlstm=512)
 
     # create vectorized environment
-    pysc2_env_vec = SubprocVecEnv([partial(make_sc2env, id=i, **env_args) for i in range(1)])
+    pysc2_env_vec = DummyVecEnv([partial(make_sc2env, id=i, **env_args) for i in range(1)])
 
     policy = policies.build_policy(pysc2_env_vec, "cnn_lstm", **network_kwargs)
     nenvs = pysc2_env_vec.num_envs
@@ -61,17 +71,5 @@ def play():
         ob, reward, done, _ = pysc2_env_vec.step(action)
         step_counter += 1
 
-
-
-
-
-    # policy = policies.build_policy(pysc2_env_vec, models.cnn_small())(nbatch=1, nsteps=1)
-    # model.load(load_path)
-    
-    # kwargs = dict(value_network='copy')
-    # learn_fn = lambda e: get_learn_function('ppo2')(env=pysc2_env_vec, **kwargs)
-    #model = ppo_learn(network="cnn_lstm", env=pysc2_env_vec, total_timesteps=1500000, gamma=0.995, nsteps=256, nminibatches=1, **network_kwargs)
-    # model.save("lstm_ppo")
-
 if __name__ == '__main__':   
-    train()
+    play()
