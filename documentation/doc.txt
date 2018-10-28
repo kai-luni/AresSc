@@ -1,13 +1,16 @@
+Alpha 4
+Bruteforce: Go through different hyper parameters and algorithms. Store the best results with gif and model
+file.
+
 Alpha 3
-- find a way to build when the screen was moved
-- build script: rebuild comman center, third supply depot
-- Reading some variable out of a config file, so I can change values in runtime.
-- use open ai baselines: PPO2
-- check issue: switched coordinates
-- parallel envs
+- find a way to build when the screen was moved - done
+- build script: rebuild comman center, third supply depot - done
+- Reading some variable out of a config file, so I can change values in runtime. - later
+- use open ai baselines: PPO2 - done
+- check issue: switched coordinates - done
+- parallel envs - done
 
 Alpha 2
-
 Problem: Its hard to put all the action space in one level. Right now its like this: 0-3 are simple tasks like to build a 
 supply depot, then there is 4 to 67 for attacking different areas of the map. That does not seem very natural and in fact 
 it does not to work very well. 4 to 67 have all the same meaning, which is to attack, but it takes more than 90% of the action 
