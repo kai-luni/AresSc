@@ -6,7 +6,6 @@ from gym import spaces
 from rl.core import Env
 from pysc2.env import sc2_env
 from pysc2.lib import actions, features, units
-
 from scripts_ares.jaervsjoe_build_base import JaervsjoeBuildBase
 from map_matrix import get_eight_by_eight_matrix, get_coordinates_by_index
 from helper_functions.obs_helper import get_current_state, get_random_unit, get_count_unit, base_is_upper_left
@@ -40,7 +39,7 @@ OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' # formats are comma-separated, bu
 OPENAI_LOGDIR='log_baselines/'
 
 class AresEnvGym(gym.Env):
-    def __init__(self, input_shape, id):
+    def __init__(self, input_shape, id, difficulty=sc2_env.Difficulty.easy):
         super(AresEnvGym, self).__init__()
         self.id = id
         # Define action and observation space
@@ -65,7 +64,7 @@ class AresEnvGym(gym.Env):
         #this is the pysc2 environment that interacts with the game
         self.pysc2_env = sc2_env.SC2Env(
                 map_name="Simple64",
-                players=[sc2_env.Agent(sc2_env.Race.terran), sc2_env.Bot(sc2_env.Race.random, sc2_env.Difficulty.easy)],
+                players=[sc2_env.Agent(sc2_env.Race.terran), sc2_env.Bot(sc2_env.Race.random, difficulty)],
                 agent_interface_format=features.AgentInterfaceFormat(feature_dimensions=features.Dimensions(screen=84, minimap=64), rgb_dimensions=features.Dimensions(screen=64, minimap=64), action_space=actions.ActionSpace.FEATURES, use_feature_units=True, use_camera_position=True),
                 step_mul=6,
                 game_steps_per_episode=40000,
@@ -89,10 +88,11 @@ class AresEnvGym(gym.Env):
         #each roundtrip consists of 6 steps, 3 attack and 3 build steps
         for i in range(6):
             if obs.last():
+                final_reward = self.episode_reward
                 print("reward: " + str(self.episode_reward))
                 self.episode_reward = 0.
                 self.last_obs = self.pysc2_env.reset()[0]
-                return self.last_obs, obs.reward, True, {}
+                return self.last_obs, obs.reward, True, {"final_reward": final_reward}
 
             if self.second_step:
                 #get the camera position on the second step, on the first step it is sometimes wrong
@@ -116,7 +116,6 @@ class AresEnvGym(gym.Env):
                 else:
                     value = self.build_Bot.moveNumberZeroZero(obs)
             elif i == 1:
-                test = Point((obs.observation["camera_position"][0]/3)*2, (obs.observation["camera_position"][1]/3)*2)
                 value = self.build_Bot.moveNumberZero(obs)
             elif i == 2:
                 value =  self.build_Bot.moveNumberOne(obs)

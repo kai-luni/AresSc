@@ -5,6 +5,7 @@ from baselines.bench import Monitor
 from functools import partial
 
 from environments.env_gym import AresEnvGym
+from pysc2.env import sc2_env
 
 
 
@@ -26,6 +27,7 @@ import numpy as np
 #     img = model.env.render(mode='rgb_array')
 
 # imageio.mimsave('lander_a2c.gif', [np.array(img[0]) for i, img in enumerate(images) if i%2 == 0], fps=29)
+difficulty = sc2_env.Difficulty.medium
 
 
 def make_sc2env(env_id=0, **kwargs):
@@ -33,7 +35,7 @@ def make_sc2env(env_id=0, **kwargs):
     from absl import flags
     FLAGS = flags.FLAGS
     FLAGS(sys.argv)
-    return Monitor(AresEnvGym((64, 64, 3), env_id), 'log.csv', allow_early_resets=True)
+    return Monitor(AresEnvGym((64, 64, 3), env_id, difficulty=difficulty), 'log.csv', allow_early_resets=True)
 
 def play():
     env_args = dict()
@@ -57,8 +59,9 @@ def play():
                     nsteps=nsteps, ent_coef=ent_coef, vf_coef=vf_coef,
                     max_grad_norm=max_grad_norm)
     model = make_model()
-    model.load("2170_ppo_cnn_lstm_512_easy")
+    model.load("4860_ppo_cnn_lstm_512_medium")
 
+    images = []
     ob = pysc2_env_vec.reset()
     state = model.initial_state
     done = [False]
@@ -67,9 +70,15 @@ def play():
     # run a single episode until the end (i.e. until done)
     while True:
         #print(step_counter)
+        images.append(ob)
         action, _, state, _ = model.step(ob, S=state, M=done)
-        ob, reward, done, _ = pysc2_env_vec.step(action)
+        ob, _, done, stats = pysc2_env_vec.step(action)
         step_counter += 1
+        if(done[0]):
+            imageio.mimsave(str(stats[0]["final_reward"]) + "_" + str(difficulty) + '.gif', [np.array(img[0]) for i, img in enumerate(images) if i%2 == 0], fps=4)
+            images = []
+    
+    
 
 if __name__ == '__main__':   
     play()
