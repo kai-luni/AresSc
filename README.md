@@ -32,7 +32,7 @@ atari-py as for this program just the gym-environment is needed.
 
 ## Results
 
-<center><img src="gifs/0.7000000000000004_Difficulty.medium.gif" width="480"/></center>
+<div style="width:100%; text-align:center;"><img src="gifs/0.7000000000000004_Difficulty.medium.gif" width="480"/></div>
 <br>
 
 <center><img src="gifs/8.299999999999997_Difficulty.medium.gif" width="480"/></center>
