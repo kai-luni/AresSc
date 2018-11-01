@@ -28,4 +28,15 @@ You will need to look it up in launcher_baselines.py. There are loads dependenci
 recommended.
 
 Another note, I ran into trouble to install atari-py under windows, which is a dependency in gym. You can install gym without 
-atari-py as for this program just the gym-environment is need.
+atari-py as for this program just the gym-environment is needed.
+
+## Results
+
+<img src="gifs/0.7000000000000004_Difficulty.medium.gif" width="480"/>
+<br>
+
+<img src="gifs/8.299999999999997_Difficulty.medium.gif" width="480"/>
+<br>
+
+<img src="gifs/14.000000000000002_Difficulty.medium.gif" width="480"/>
+<br>
