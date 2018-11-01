@@ -9,6 +9,7 @@ import numpy as np
 def norm(x):
     return np.sqrt(np.dot(x, x))
 
+"""Plotting is not working right now, a working version will be implemented soon"""
 def main(arg):
     if(not os.path.isfile('model/episodes.p') or not os.path.isfile('model/losses.p') or not os.path.isfile('model/game_scores.p')):
         print("at least one important file is missing")
