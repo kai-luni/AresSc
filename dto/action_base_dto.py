@@ -1,10 +1,5 @@
 class ActionBaseDto:
     """actions for building the base"""
-    # def __init__():
-    #     self.do_nothing_var = 'do_nothing'
-    #     self.build_supply_depot_var = 'build_supply_depot'
-    #     self.build_barracks_var = 'build_barracks'
-    #     self.build_marine_var = 'builld_marine' 
 
     def get_action_by_index(self, index):
         """for later when a neural net decides"""

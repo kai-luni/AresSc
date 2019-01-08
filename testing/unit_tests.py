@@ -1,6 +1,6 @@
 """Run some basic tests, minimize bugs"""
 
-from map_matrix import get_eight_by_eight_matrix
+from helper_functions.map_matrix import get_eight_by_eight_matrix
 
 def test_map_matrix():
     """test the module map_matrix"""

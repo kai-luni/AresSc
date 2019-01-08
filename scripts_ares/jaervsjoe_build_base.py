@@ -1,6 +1,6 @@
 from dto.action_base_dto import ActionBaseDto
 from helper_functions.obs_helper import get_current_state, get_random_unit, get_count_unit, base_is_upper_left
-from point_rect import Point
+from helper_functions.point_rect import Point
 
 from pysc2.lib import actions, features, units
 

@@ -18,7 +18,7 @@ class AresProcessor(Processor):
         # print(self.input_shape)
         #assert processed_observation.shape == self.input_shape
         #return rgb_minimap.astype('uint8')  # saves storage in experience memory
-        return processed_observation
+        #return processed_observation
 
     def process_state_batch(self, batch):
         # We could perform this processing step in `process_observation`. In this case, however,
@@ -28,7 +28,7 @@ class AresProcessor(Processor):
         #     test = batch[i]
         #     print(test)
         #processed_batch = (batch.astype('float32') / 128.)-1.
-        return processed_batch
+        return batch
 
     def process_reward(self, reward):
         #return np.clip(reward, -1., 1.)

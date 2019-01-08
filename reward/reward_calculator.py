@@ -28,6 +28,7 @@ class RewardCalculator:
         self.last_kdh_state = None
 
     def get_reward(self, kdh_state):
+        """get appropriate reward depending on the difference between last state and current state"""
 
         if(self.last_kdh_state == None):
             self.last_kdh_state = kdh_state
@@ -63,14 +64,12 @@ class RewardCalculator:
 
         return reward
 
-    def get_reward_from_observation(self, obs,):
+    def get_reward_from_observation(self, obs):
         state_dto = KdhStateDto()
 
         state_dto.killed_enemies = obs.observation['score_cumulative'][5]
         state_dto.destroyed_buildings = obs.observation['score_cumulative'][6]
 
-
-        unit_type = obs.observation['rgb_screen'][_UNIT_TYPE]
         # cc_y, cc_x = (unit_type == _TERRAN_COMMANDCENTER).nonzero()
         # cc_count = 1 if cc_y.any() else 0
         cc_count = get_count_unit(obs, units.Terran.CommandCenter)

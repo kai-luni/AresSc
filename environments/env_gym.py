@@ -7,11 +7,11 @@ from rl.core import Env
 from pysc2.env import sc2_env
 from pysc2.lib import actions, features, units
 from scripts_ares.jaervsjoe_build_base import JaervsjoeBuildBase
-from map_matrix import get_eight_by_eight_matrix, get_coordinates_by_index
+from helper_functions.map_matrix import get_eight_by_eight_matrix, get_coordinates_by_index
 from helper_functions.obs_helper import get_current_state, get_random_unit, get_count_unit, base_is_upper_left
 from reward.reward_calculator import RewardCalculator
 from ares_processor import AresProcessor
-from point_rect import Point
+from helper_functions.point_rect import Point
 
 
 _NOT_QUEUED = [0]
